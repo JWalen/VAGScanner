@@ -75,7 +75,15 @@ pip install -e ".[gui]"   # desktop GUI
 pip install -e ".[dev]"   # everything + test tooling
 ```
 
-Generate sample files to try things out without a car:
+Try it without a car — ready-made example files are committed in
+[`examples/`](examples/) (a classic group log, an Advanced/UDS log and an
+Auto-Scan). Parse them all:
+
+```powershell
+python scripts/smoke_logs.py examples
+```
+
+Or regenerate fresh synthetic files anywhere:
 
 ```powershell
 python scripts/make_samples.py samples

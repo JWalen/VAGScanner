@@ -35,7 +35,14 @@ def _resolve_dir(argv) -> str:
     default = r"C:\Ross-Tech\VCDS\Logs"
     if os.path.isdir(default):
         return default
-    # Fall back to generated samples.
+    # Prefer the committed examples folder if it exists.
+    examples = os.path.join(os.path.dirname(_HERE), "examples")
+    if os.path.isdir(examples) and any(
+        f.lower().endswith((".csv", ".txt")) for f in os.listdir(examples)
+    ):
+        print(f"[smoke] No VCDS Logs folder found; using committed examples in {examples}")
+        return examples
+    # Otherwise generate throwaway samples.
     import make_samples
 
     tmp = tempfile.mkdtemp(prefix="vcds_smoke_")
