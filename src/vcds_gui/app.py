@@ -755,6 +755,211 @@ if _HAVE_QT:
                 self.main.open_in_analyzer(path)
 
     # --------------------------------------------------------------------- #
+    # Help
+    # --------------------------------------------------------------------- #
+    HELP_HTML = """
+    <h2>VCDS Toolkit — User Guide</h2>
+    <p>Analyze VCDS logs and capture live OBD-II data from a VAG/Audi car.
+    There are two tabs that share one plot.</p>
+
+    <h3>What it does &mdash; and does not</h3>
+    <ul>
+      <li><b>Reads the files VCDS writes</b> (measuring <code>.CSV</code> logs and
+          Auto-Scan <code>.TXT</code> reports). It does <b>not</b> control the VCDS
+          application or the HEX-V2/HEX-NET cable &mdash; Ross-Tech exposes no API
+          for that.</li>
+      <li><b>Live data comes from a generic ELM327</b> adapter only. A generic
+          ELM327 exposes the standard OBD-II PIDs and is <b>blind to the
+          VAG-specific channels</b> VCDS reads. An <b>OBDeleven</b> dongle is
+          locked to its own app and cannot be used here.</li>
+    </ul>
+
+    <h3>Tab 1 &mdash; File Analyzer</h3>
+    <ol>
+      <li><b>Open Measuring CSV…</b> loads a log; its channels appear in the left
+          list. Tick/untick a channel to show or hide its trace (the colour
+          matches the plot).</li>
+      <li><b>Open Auto-Scan…</b> (optional) shows faults grouped by module on the
+          right, with each fault's status detail.</li>
+      <li><b>Find Events</b> runs the built-in VAG heuristics (specified-vs-actual
+          divergence, rising counters, per-channel extremes). Click any event to
+          jump the cursor to its time.</li>
+      <li><b>Add threshold rule</b> (channel / operator / value) then
+          <b>Apply Rules</b> to find threshold crossings, e.g.
+          <code>Boost &lt; 1700</code>.</li>
+      <li><b>Export View…</b> writes the samples currently in view to a new CSV.</li>
+    </ol>
+
+    <h3>Tab 2 &mdash; Live (OBD-II)</h3>
+    <ol>
+      <li><b>Scan Ports</b>, pick your adapter's port (or type it), choose a baud
+          (Auto, or 38400 / 9600 / 115200 for clones), then <b>Connect</b>.</li>
+      <li>The supported PIDs appear on the left &mdash; tick the ones to log.</li>
+      <li><b>Read DTCs</b> shows stored trouble codes. <b>Clear DTCs…</b> erases
+          them and is always behind a confirmation &mdash; it is never automatic.</li>
+      <li>Set an <b>event-capture trigger</b>: threshold rules and/or
+          &ldquo;trigger on any new DTC&rdquo;. When it fires during logging, a
+          clipped capture (with context from <i>before</i> the trigger) is saved.</li>
+      <li><b>Start Logging</b> / <b>Stop</b>. On stop, the session CSV is saved to
+          your logs folder. Captured events appear at the lower left &mdash;
+          double-click one to open it in the File Analyzer tab.</li>
+    </ol>
+
+    <h3>The plot</h3>
+    <ul>
+      <li>Channels have wildly different scales, so traces are drawn
+          <b>normalized</b> (toggle the <b>Normalize</b> checkbox to see raw
+          values). The vertical cursor always reads out each visible channel's
+          <b>real</b> value and unit at the cursor time.</li>
+      <li>Scroll to zoom, drag to pan, right-click for more options.</li>
+    </ul>
+
+    <h3>Tips</h3>
+    <ul>
+      <li>Prefer a <b>USB</b> ELM327; Bluetooth clones drop samples.</li>
+      <li>Logs and live sessions are read from / written to the folder in
+          <code>VCDS_LOGS_DIR</code> (shown in the status bar).</li>
+      <li>The derived <b>Boost (derived)</b> channel = MAP &minus; barometric
+          pressure.</li>
+    </ul>
+
+    <p>Project &amp; docs:
+    <a href="https://github.com/JWalen/VAGScanner">github.com/JWalen/VAGScanner</a></p>
+    """
+
+    class HelpDialog(QtWidgets.QDialog):
+        def __init__(self, version: str, parent=None):
+            super().__init__(parent)
+            self.setWindowTitle("VCDS Toolkit — User Guide")
+            self.resize(760, 680)
+            layout = QtWidgets.QVBoxLayout(self)
+            browser = QtWidgets.QTextBrowser()
+            browser.setOpenExternalLinks(True)
+            browser.setHtml(f"<p style='color:#718096'>Version {version}</p>" + HELP_HTML)
+            layout.addWidget(browser)
+            buttons = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Close)
+            buttons.rejected.connect(self.reject)
+            buttons.accepted.connect(self.accept)
+            layout.addWidget(buttons)
+
+    # First-run quick tour pages: (title, html body).
+    TOUR_PAGES = [
+        (
+            "Welcome to VCDS Toolkit 👋",
+            "<p>Analyze VCDS logs and capture live OBD-II data from your VAG/Audi.</p>"
+            "<p>Two things to know up front:</p>"
+            "<ul>"
+            "<li>It <b>reads the files VCDS writes</b> — it does not control VCDS "
+            "or the HEX cable.</li>"
+            "<li>Live data comes from a <b>generic ELM327</b> only, which sees the "
+            "standard OBD-II PIDs (not VAG-specific channels).</li>"
+            "</ul>"
+            "<p>This quick tour takes 20 seconds. You can reopen it any time from "
+            "<b>Help → Quick Tour</b>.</p>",
+        ),
+        (
+            "Tab 1 — File Analyzer 📈",
+            "<p>Open a measuring <b>CSV</b> (and optionally an <b>Auto-Scan</b>).</p>"
+            "<ul>"
+            "<li>Tick channels on the left to show/hide their traces.</li>"
+            "<li><b>Find Events</b> highlights divergence, rising counters and "
+            "extremes; click an event to jump the cursor there.</li>"
+            "<li>Add <b>threshold rules</b> (e.g. <code>Boost &lt; 1700</code>) and "
+            "<b>Export View…</b> to clip the current window to a new CSV.</li>"
+            "</ul>",
+        ),
+        (
+            "Tab 2 — Live (OBD-II) 🔌",
+            "<p>Plug in a generic ELM327 (USB preferred), <b>Scan Ports</b>, "
+            "<b>Connect</b>, then tick the PIDs to log.</p>"
+            "<ul>"
+            "<li><b>Read / Clear DTCs</b> — clearing always asks first.</li>"
+            "<li>Set a <b>trigger</b> (threshold or any new DTC) to auto-save a "
+            "clipped capture around an intermittent fault.</li>"
+            "<li><b>Start / Stop Logging</b>; the session CSV is immediately "
+            "analyzable back in Tab 1.</li>"
+            "</ul>",
+        ),
+        (
+            "Tips & help 💡",
+            "<ul>"
+            "<li>Traces are <b>normalized</b> so different scales fit one axis; the "
+            "cursor still reads each channel's real value.</li>"
+            "<li>Files live in the folder shown in the status bar "
+            "(<code>VCDS_LOGS_DIR</code>).</li>"
+            "<li>Press <b>F1</b> any time for the full User Guide.</li>"
+            "</ul>"
+            "<p>Have fun — and drive safely. 🏎️</p>",
+        ),
+    ]
+
+    class QuickTourDialog(QtWidgets.QDialog):
+        def __init__(self, settings, show_startup_default: bool, parent=None):
+            super().__init__(parent)
+            self.settings = settings
+            self.setWindowTitle("Welcome to VCDS Toolkit")
+            self.resize(580, 440)
+            v = QtWidgets.QVBoxLayout(self)
+
+            self.stack = QtWidgets.QStackedWidget()
+            v.addWidget(self.stack, 1)
+            for title, body in TOUR_PAGES:
+                label = QtWidgets.QLabel(f"<h2>{title}</h2>{body}")
+                label.setTextFormat(QtCore.Qt.RichText)
+                label.setWordWrap(True)
+                label.setAlignment(QtCore.Qt.AlignTop)
+                label.setOpenExternalLinks(True)
+                area = QtWidgets.QScrollArea()
+                area.setWidgetResizable(True)
+                area.setWidget(label)
+                self.stack.addWidget(area)
+
+            nav = QtWidgets.QHBoxLayout()
+            self.chk = QtWidgets.QCheckBox("Show this tour at startup")
+            self.chk.setChecked(show_startup_default)
+            self.lbl_step = QtWidgets.QLabel()
+            self.btn_back = QtWidgets.QPushButton("Back")
+            self.btn_next = QtWidgets.QPushButton("Next")
+            nav.addWidget(self.chk)
+            nav.addStretch(1)
+            nav.addWidget(self.lbl_step)
+            nav.addWidget(self.btn_back)
+            nav.addWidget(self.btn_next)
+            v.addLayout(nav)
+
+            self.btn_back.clicked.connect(self._back)
+            self.btn_next.clicked.connect(self._next)
+            self.stack.currentChanged.connect(self._update)
+            self._update()
+
+        def _update(self):
+            i, n = self.stack.currentIndex(), self.stack.count()
+            self.btn_back.setEnabled(i > 0)
+            self.btn_next.setText("Finish" if i == n - 1 else "Next")
+            self.lbl_step.setText(f"{i + 1} / {n}")
+
+        def _back(self):
+            self.stack.setCurrentIndex(max(0, self.stack.currentIndex() - 1))
+
+        def _next(self):
+            i = self.stack.currentIndex()
+            if i >= self.stack.count() - 1:
+                self.accept()
+            else:
+                self.stack.setCurrentIndex(i + 1)
+
+        def _persist(self):
+            self.settings.setValue("ui/show_tour", self.chk.isChecked())
+
+        def accept(self):
+            self._persist()
+            super().accept()
+
+        def reject(self):
+            self._persist()
+            super().reject()
+
+    # --------------------------------------------------------------------- #
     # Main window
     # --------------------------------------------------------------------- #
     class MainWindow(QtWidgets.QMainWindow):
@@ -762,6 +967,7 @@ if _HAVE_QT:
             super().__init__()
             from vcds_core import __version__ as _ver
 
+            self._version = _ver
             self.setWindowTitle(f"VCDS Toolkit v{_ver}")
             icon = _find_app_icon()
             if icon:
@@ -773,7 +979,55 @@ if _HAVE_QT:
             self.live_tab = LiveTab(self)
             self.tabs.addTab(self.analyzer, "File Analyzer")
             self.tabs.addTab(self.live_tab, "Live (OBD-II)")
-            self.statusBar().showMessage(f"Logs dir: {DEFAULT_LOGS_DIR}")
+
+            self.settings = QtCore.QSettings("DeltaModTech", "VCDS Toolkit")
+            self._build_menu()
+            self.statusBar().showMessage(
+                f"Logs dir: {DEFAULT_LOGS_DIR}   ·   Press F1 for help"
+            )
+            # Offer the quick tour on first run (after the window is shown).
+            QtCore.QTimer.singleShot(400, self._maybe_first_run_tour)
+
+        def _build_menu(self):
+            help_menu = self.menuBar().addMenu("&Help")
+            tour = QtGui.QAction("&Quick Tour", self)
+            tour.triggered.connect(lambda: self.show_tour(force=True))
+            help_menu.addAction(tour)
+            guide = QtGui.QAction("User &Guide", self)
+            guide.setShortcut(QtGui.QKeySequence.HelpContents)  # F1
+            guide.triggered.connect(self.show_help)
+            help_menu.addAction(guide)
+            help_menu.addSeparator()
+            about = QtGui.QAction("&About", self)
+            about.triggered.connect(self.show_about)
+            help_menu.addAction(about)
+
+        def _maybe_first_run_tour(self):
+            # Never auto-pop a modal in headless/offscreen runs (tests, CI).
+            if os.environ.get("QT_QPA_PLATFORM") == "offscreen":
+                return
+            if self.settings.value("ui/show_tour", True, type=bool):
+                self.show_tour()
+
+        def show_tour(self, force: bool = False):
+            show_default = self.settings.value("ui/show_tour", True, type=bool)
+            QuickTourDialog(self.settings, show_default, self).exec()
+
+        def show_help(self):
+            HelpDialog(self._version, self).exec()
+
+        def show_about(self):
+            QtWidgets.QMessageBox.about(
+                self,
+                "About VCDS Toolkit",
+                f"<b>VCDS Toolkit</b> v{self._version}<br>"
+                "Analyze VCDS logs &amp; Auto-Scans and capture live ELM327 "
+                "OBD-II data.<br><br>"
+                "Reads the files VCDS writes; it does not control VCDS or the "
+                "HEX cable. Live data is from a generic ELM327 only.<br><br>"
+                '<a href="https://github.com/JWalen/VAGScanner">'
+                "github.com/JWalen/VAGScanner</a>",
+            )
 
         def open_in_analyzer(self, path: str):
             self.analyzer.load_csv(path)

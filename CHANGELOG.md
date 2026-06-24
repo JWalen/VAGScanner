@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- In-app help: a **Help** menu with a scrollable **User Guide** (F1) and an
+  **About** box, plus a **Quick Tour** shown on first start-up (with a "show at
+  startup" toggle, re-openable from Help → Quick Tour).
+
 ## [0.1.0] - 2026-06-24
 
 First public release.

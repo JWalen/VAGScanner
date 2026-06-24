@@ -57,6 +57,34 @@ def test_analyzer_loads_csv_and_runs_events(qapp, samples_dir):
     win.close()
 
 
+def test_help_dialog_builds(qapp):
+    win = gui_app.MainWindow()
+    dlg = gui_app.HelpDialog(win._version, win)
+    assert "User Guide" in dlg.windowTitle()
+    win.close()
+
+
+def test_quick_tour_navigation(qapp, tmp_path):
+    from PySide6 import QtCore
+
+    settings = QtCore.QSettings(str(tmp_path / "settings.ini"), QtCore.QSettings.IniFormat)
+    dlg = gui_app.QuickTourDialog(settings, show_startup_default=True)
+    assert dlg.stack.count() == len(gui_app.TOUR_PAGES) == 4
+    assert dlg.btn_next.text() == "Next"
+    assert not dlg.btn_back.isEnabled()  # first page
+
+    # advance to the final page
+    for _ in range(dlg.stack.count() - 1):
+        dlg._next()
+    assert dlg.btn_next.text() == "Finish"
+    assert dlg.btn_back.isEnabled()
+
+    # unticking "show at startup" must persist
+    dlg.chk.setChecked(False)
+    dlg._persist()
+    assert settings.value("ui/show_tour", True, type=bool) is False
+
+
 def test_analyzer_loads_autoscan(qapp, samples_dir):
     win = gui_app.MainWindow()
     tab = win.analyzer
