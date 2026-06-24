@@ -763,6 +763,9 @@ if _HAVE_QT:
             from vcds_core import __version__ as _ver
 
             self.setWindowTitle(f"VCDS Toolkit v{_ver}")
+            icon = _find_app_icon()
+            if icon:
+                self.setWindowIcon(QtGui.QIcon(icon))
             self.resize(1280, 800)
             self.tabs = QtWidgets.QTabWidget()
             self.setCentralWidget(self.tabs)
@@ -775,6 +778,20 @@ if _HAVE_QT:
         def open_in_analyzer(self, path: str):
             self.analyzer.load_csv(path)
             self.tabs.setCurrentWidget(self.analyzer)
+
+
+def _find_app_icon() -> Optional[str]:
+    """Locate app.ico in the PyInstaller bundle or the source tree, else None."""
+    candidates = []
+    base = getattr(sys, "_MEIPASS", None)  # set when frozen by PyInstaller
+    if base:
+        candidates.append(os.path.join(base, "app.ico"))
+    here = os.path.dirname(os.path.abspath(__file__))
+    candidates.append(os.path.join(here, "..", "..", "installer", "app.ico"))
+    for c in candidates:
+        if c and os.path.isfile(c):
+            return c
+    return None
 
 
 def _export_clip(mlog: "parse.MeasuringLog", path: str, xmin: float, xmax: float) -> int:

@@ -51,7 +51,8 @@ First public release.
 
 **Tooling & packaging**
 - `scripts/make_samples.py` and committed `examples/`; `scripts/smoke_logs.py`.
-- Windows installer (PyInstaller one-folder bundle + Inno Setup).
+- Windows installer (PyInstaller one-folder bundle + Inno Setup) with a branded
+  boost-gauge application icon (`scripts/make_icon.py`).
 - GitHub Actions release workflow: tests, builds the wheel/sdist and the
   installer, and publishes a GitHub Release on each `v*` tag.
 - 54-test pytest suite (no hardware; the live path is mocked).

@@ -18,6 +18,8 @@ SPEC_DIR = os.path.abspath(SPECPATH)
 ROOT = os.path.dirname(SPEC_DIR)
 SRC = os.path.join(ROOT, "src")
 ENTRY = os.path.join(SRC, "vcds_gui", "__main__.py")
+ICON = os.path.join(SPEC_DIR, "app.ico")
+ICON = ICON if os.path.isfile(ICON) else None
 
 # pyqtgraph does a lot of dynamic importing; pull it in wholesale to be safe.
 pg_datas, pg_binaries, pg_hidden = collect_all("pyqtgraph")
@@ -33,11 +35,13 @@ if os.path.isdir(examples_dir):
 
 block_cipher = None
 
+icon_datas = [(ICON, ".")] if ICON else []
+
 a = Analysis(
     [ENTRY],
     pathex=[SRC],
     binaries=pg_binaries,
-    datas=pg_datas + example_datas,
+    datas=pg_datas + example_datas + icon_datas,
     hiddenimports=pg_hidden
     + [
         "vcds_core",
@@ -86,7 +90,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=None,  # drop a .ico here later to brand it
+    icon=ICON,  # installer/app.ico — see scripts/make_icon.py
 )
 
 coll = COLLECT(
