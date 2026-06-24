@@ -206,23 +206,30 @@ gracefully when none is connected): `list_serial_ports`, `obd_status`,
 
 ---
 
-## Releases
+## Versioning & releases
+
+This project follows [Semantic Versioning](https://semver.org/) and keeps a
+[`CHANGELOG.md`](CHANGELOG.md) in the [Keep a Changelog](https://keepachangelog.com/)
+format. The version lives in **one place** — `pyproject.toml` — and is surfaced
+at runtime as `vcds_core.__version__` (and in the GUI title bar).
 
 Releases are cut by GitHub Actions (`.github/workflows/release.yml`). On a
-version tag push it runs the full test suite, builds the wheel + sdist, and
-publishes a GitHub Release with those artifacts and auto-generated notes.
+version-tag push it runs the full test suite, builds the wheel + sdist **and the
+Windows installer**, and publishes a GitHub Release with all artifacts and
+auto-generated notes.
 
-The tag must match the `version` in `pyproject.toml` (single source of truth):
+To cut a release:
 
 ```powershell
-# 1. bump version in pyproject.toml, commit it
-# 2. tag and push:
-git tag v0.1.0
-git push origin v0.1.0
+# 1. bump `version` in pyproject.toml
+# 2. move the CHANGELOG "Unreleased" items under a new version heading + date
+# 3. commit, then tag and push:
+git tag v0.2.0
+git push origin v0.2.0
 ```
 
-You can also trigger it manually from the **Actions → Release** tab and supply a
-tag. The workflow fails fast if the tag and `pyproject.toml` version disagree.
+The tag must match the `pyproject.toml` version (the workflow fails fast if they
+disagree). You can also trigger it manually from the **Actions → Release** tab.
 
 ## Project layout
 

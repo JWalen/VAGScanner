@@ -760,7 +760,9 @@ if _HAVE_QT:
     class MainWindow(QtWidgets.QMainWindow):
         def __init__(self):
             super().__init__()
-            self.setWindowTitle("VCDS Toolkit")
+            from vcds_core import __version__ as _ver
+
+            self.setWindowTitle(f"VCDS Toolkit v{_ver}")
             self.resize(1280, 800)
             self.tabs = QtWidgets.QTabWidget()
             self.setCentralWidget(self.tabs)
