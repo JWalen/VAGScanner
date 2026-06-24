@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vcds-toolkit"
+version = "0.1.0"
+description = "Analyze VCDS measuring logs & Auto-Scans and capture live ELM327 OBD-II data, surfaced via an MCP server and a desktop GUI."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "DeltaModTech" }]
+keywords = ["vcds", "vag", "audi", "obd2", "elm327", "ross-tech", "mcp"]
+
+# vcds_core is intentionally dependency-free; nothing here is needed to parse files.
+dependencies = []
+
+[project.optional-dependencies]
+# Live ELM327 OBD-II logging.
+obd = ["obd>=0.7.1", "pyserial>=3.5"]
+# FastMCP stdio server.
+mcp = ["mcp>=1.2.0"]
+# Desktop GUI.
+gui = ["PySide6>=6.6", "pyqtgraph>=0.13"]
+# Everything + test tooling.
+dev = [
+    "obd>=0.7.1",
+    "pyserial>=3.5",
+    "mcp>=1.2.0",
+    "PySide6>=6.6",
+    "pyqtgraph>=0.13",
+    "pytest>=7.4",
+    "pytest-asyncio>=0.23",
+]
+
+[project.scripts]
+vcds-mcp = "vcds_mcp.server:main"
+vcds-gui = "vcds_gui.app:main"
+vcds-obd-log = "vcds_obd.live:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src", "scripts"]
+testpaths = ["tests"]
+asyncio_mode = "auto"
