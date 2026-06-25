@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-06-24
+
 ### Added
 - In-app help: a **Help** menu with a scrollable **User Guide** (F1) and an
   **About** box, plus a **Quick Tour** shown on first start-up (with a "show at
@@ -66,5 +68,6 @@ First public release.
   installer, and publishes a GitHub Release on each `v*` tag.
 - 54-test pytest suite (no hardware; the live path is mocked).
 
-[Unreleased]: https://github.com/JWalen/VAGScanner/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/JWalen/VAGScanner/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/JWalen/VAGScanner/releases/tag/v0.2.0
 [0.1.0]: https://github.com/JWalen/VAGScanner/releases/tag/v0.1.0
