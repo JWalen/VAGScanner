@@ -269,6 +269,14 @@ def test_pdf_export_path(qapp, tmp_path, samples_dir):
     assert out.is_file() and out.stat().st_size > 0
 
 
+def test_enhanced_pids_dialog_builds(qapp):
+    win = gui_app.MainWindow()
+    dlg = gui_app.EnhancedPidsDialog(win)
+    assert dlg.table.rowCount() == len(dlg.pids)
+    assert dlg.table.rowCount() >= 1  # bundled examples present
+    win.close()
+
+
 def test_mcp_install_dialog_builds(qapp):
     dlg = gui_app.McpInstallDialog(r"C:\Ross-Tech\VCDS\Logs")
     assert dlg.logs_edit.text() == r"C:\Ross-Tech\VCDS\Logs"

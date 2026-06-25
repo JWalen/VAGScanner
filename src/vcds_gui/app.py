@@ -1956,6 +1956,81 @@ if _HAVE_QT:
             )
             self.btn_send.setEnabled(True)
 
+    class EnhancedPidsDialog(QtWidgets.QDialog):
+        """View / read experimental manufacturer (mode 22) enhanced PIDs."""
+
+        def __init__(self, main_window, parent=None):
+            super().__init__(parent)
+            from vcds_obd import enhanced
+
+            self.main = main_window
+            self.enh = enhanced
+            self.path = os.path.join(DEFAULT_LOGS_DIR, "enhanced_pids.json")
+            self.pids = enhanced.load_library(self.path)
+            self.setWindowTitle("Enhanced PIDs (experimental)")
+            self.resize(840, 520)
+            v = QtWidgets.QVBoxLayout(self)
+
+            warn = QtWidgets.QLabel(
+                "⚠ <b>Experimental.</b> Manufacturer (mode 22) PIDs and their formulas are "
+                "vehicle-specific and are <b>not validated here</b>. Edit the library file with "
+                "values for your vehicle (e.g. from FORScan community PID lists) before trusting "
+                "readings. Reads are safe — service $22 is read-only.")
+            warn.setWordWrap(True)
+            warn.setStyleSheet("color:#DD6B20;")
+            v.addWidget(warn)
+
+            cols = ["Brand", "Name", "DID", "Unit", "Formula (a,b,…=bytes)", "Value"]
+            self.table = QtWidgets.QTableWidget(len(self.pids), len(cols))
+            self.table.setHorizontalHeaderLabels(cols)
+            self.table.setEditTriggers(QtWidgets.QTableWidget.NoEditTriggers)
+            for r, p in enumerate(self.pids):
+                for c, val in enumerate([p.brand, p.name, p.did, p.unit, p.formula, ""]):
+                    self.table.setItem(r, c, QtWidgets.QTableWidgetItem(val))
+            self.table.resizeColumnsToContents()
+            self.table.horizontalHeader().setStretchLastSection(True)
+            v.addWidget(self.table, 1)
+
+            bar = QtWidgets.QHBoxLayout()
+            self.btn_read = QtWidgets.QPushButton("Read with connected adapter")
+            self.btn_save = QtWidgets.QPushButton("Save library file…")
+            bar.addWidget(self.btn_read)
+            bar.addWidget(self.btn_save)
+            bar.addStretch(1)
+            bar.addWidget(QtWidgets.QLabel(f"<span style='color:#718096'>{self.path}</span>"))
+            v.addLayout(bar)
+            self.btn_read.clicked.connect(self._read)
+            self.btn_save.clicked.connect(self._save)
+
+            buttons = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Close)
+            buttons.rejected.connect(self.reject)
+            buttons.accepted.connect(self.accept)
+            v.addWidget(buttons)
+
+        def _read(self):
+            conn = getattr(self.main.live_tab, "conn", None)
+            if conn is None:
+                QtWidgets.QMessageBox.information(
+                    self, "Enhanced PIDs", "Connect to an adapter in the Live tab first.")
+                return
+            for r, p in enumerate(self.pids):
+                val = self.enh.query_enhanced(conn, p)
+                self.table.setItem(
+                    r, 5, QtWidgets.QTableWidgetItem("—" if val is None else f"{val:g} {p.unit}"))
+
+        def _save(self):
+            try:
+                os.makedirs(os.path.dirname(self.path), exist_ok=True)
+                self.enh.save_library(self.path, self.pids)
+            except Exception as exc:  # noqa: BLE001
+                QtWidgets.QMessageBox.critical(self, "Save failed", str(exc))
+                return
+            QtWidgets.QMessageBox.information(
+                self, "Saved",
+                f"Wrote {self.path}\n\nEdit this JSON to add enhanced PIDs for your vehicle "
+                "(name, 16-bit DID, unit, and a formula over data bytes a,b,c…), then reopen "
+                "this dialog.")
+
     # --------------------------------------------------------------------- #
     # Main window
     # --------------------------------------------------------------------- #
@@ -2028,6 +2103,9 @@ if _HAVE_QT:
             mcp_action = QtGui.QAction("Install &MCP Server (for Claude)…", self)
             mcp_action.triggered.connect(self.show_mcp_install)
             tools_menu.addAction(mcp_action)
+            enh_action = QtGui.QAction("&Enhanced PIDs (experimental)…", self)
+            enh_action.triggered.connect(self.show_enhanced_pids)
+            tools_menu.addAction(enh_action)
 
             help_menu = self.menuBar().addMenu("&Help")
             tour = QtGui.QAction("&Quick Tour", self)
@@ -2090,6 +2168,9 @@ if _HAVE_QT:
 
         def show_mcp_install(self):
             McpInstallDialog(DEFAULT_LOGS_DIR, self).exec()
+
+        def show_enhanced_pids(self):
+            EnhancedPidsDialog(self, self).exec()
 
         def show_help(self):
             HelpDialog(self._version, self).exec()

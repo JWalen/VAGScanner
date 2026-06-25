@@ -66,6 +66,7 @@ a = Analysis(
         "vcds_obd",
         "vcds_obd.live",
         "vcds_obd.mcp_tools",
+        "vcds_obd.enhanced",
         "vcds_mcp",
         "vcds_mcp.server",
         "vcds_mcp.install",

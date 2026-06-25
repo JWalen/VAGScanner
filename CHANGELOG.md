@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-06-25
+
+### Added
+- **Enhanced PIDs (experimental)** — a framework for manufacturer-specific
+  UDS service-$22 PIDs (`vcds_obd.enhanced`): a user-editable library of PIDs
+  (name, 16-bit DID, unit, and a **safe formula** over the response data bytes),
+  a query path over the ELM327 (`Connection.query_raw`), and a Tools → "Enhanced
+  PIDs (experimental)" dialog to read them against a connected adapter and save
+  the library to JSON.
+  - ⚠ DIDs/formulas are vehicle-specific and **not validated** — the bundled
+    entries are clearly-marked examples; edit the JSON with values for your
+    vehicle (e.g. FORScan community lists) before trusting readings. Reads are
+    read-only and safe.
+
 ## [0.12.0] - 2026-06-25
 
 ### Added
@@ -211,7 +225,8 @@ First public release.
   installer, and publishes a GitHub Release on each `v*` tag.
 - 54-test pytest suite (no hardware; the live path is mocked).
 
-[Unreleased]: https://github.com/JWalen/VAGScanner/compare/v0.12.0...HEAD
+[Unreleased]: https://github.com/JWalen/VAGScanner/compare/v0.13.0...HEAD
+[0.13.0]: https://github.com/JWalen/VAGScanner/releases/tag/v0.13.0
 [0.12.0]: https://github.com/JWalen/VAGScanner/releases/tag/v0.12.0
 [0.11.0]: https://github.com/JWalen/VAGScanner/releases/tag/v0.11.0
 [0.10.0]: https://github.com/JWalen/VAGScanner/releases/tag/v0.10.0

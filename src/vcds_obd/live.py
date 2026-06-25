@@ -629,6 +629,40 @@ class PyOBDConnection:
                 out.append((str(code), str(desc)))
         return out
 
+    def query_raw(self, request_hex: str) -> List[int]:
+        """Send a raw service request via a one-off python-OBD command.
+
+        Returns the response payload bytes (after the service byte + echoed
+        identifier). Enhanced PIDs work most reliably with the raw ELM327 driver;
+        this is a best-effort path through python-OBD.
+        """
+        obd = self._obd
+        try:
+            def _decode(messages):
+                return messages[0].data if messages else b""
+
+            cmd = obd.OBDCommand("ENHANCED", "enhanced", bytes(request_hex, "ascii"),
+                                 0, _decode, fast=False)
+            if self._is_async:
+                with self._conn.paused():
+                    resp = obd.OBD.query(self._conn, cmd, force=True)
+            else:
+                resp = self._conn.query(cmd, force=True)
+        except Exception:  # noqa: BLE001
+            return []
+        if resp is None or resp.is_null() or not resp.value:
+            return []
+        data = list(resp.value)
+        try:
+            service = int(request_hex[0:2], 16) + 0x40
+        except ValueError:
+            return data
+        if service in data:
+            i = data.index(service)
+            ident = max(0, (len(request_hex.strip()) - 2) // 2)
+            return data[i + 1 + ident:]
+        return data
+
     def clear_dtcs(self) -> bool:
         """Clear stored DTCs. EXPLICIT user action only — never call automatically."""
         cmd = getattr(self._obd.commands, "CLEAR_DTC", None)
@@ -759,6 +793,27 @@ class RawELM327Connection:
             return float(decode(data))
         except Exception:  # noqa: BLE001
             return None
+
+    def query_raw(self, request_hex: str) -> List[int]:
+        """Send a raw service request (e.g. ``"221E1C"``) and return data bytes.
+
+        Strips the positive-response service byte (request[0]+0x40) and the
+        echoed identifier, returning just the payload bytes.
+        """
+        toks = self._hex_bytes(self._transact(request_hex))
+        if not toks:
+            return []
+        try:
+            service = int(request_hex[0:2], 16)
+        except ValueError:
+            return toks
+        resp_service = service + 0x40  # 22 -> 62, 01 -> 41
+        if resp_service in toks:
+            i = toks.index(resp_service)
+            # number of identifier bytes echoed = (len(request)-2)//2
+            ident_bytes = max(0, (len(request_hex.strip()) - 2) // 2)
+            return toks[i + 1 + ident_bytes:]
+        return toks
 
     @staticmethod
     def _decode_dtc(b1: int, b2: int) -> str:
