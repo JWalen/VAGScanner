@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-06-24
+
+### Added
+- **In-app AI Assistant** (new tab): chat with **Anthropic (Claude)**,
+  **OpenAI (GPT)** or **Google (Gemini)** to help diagnose the car. Enter and
+  save an API key per provider, choose a model, and the assistant automatically
+  includes your current scan/log diagnosis as context. Uses thin REST clients
+  (no provider SDKs); API keys are stored in local user settings.
+
 ## [0.5.0] - 2026-06-24
 
 ### Added
@@ -136,7 +145,8 @@ First public release.
   installer, and publishes a GitHub Release on each `v*` tag.
 - 54-test pytest suite (no hardware; the live path is mocked).
 
-[Unreleased]: https://github.com/JWalen/VAGScanner/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/JWalen/VAGScanner/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/JWalen/VAGScanner/releases/tag/v0.6.0
 [0.5.0]: https://github.com/JWalen/VAGScanner/releases/tag/v0.5.0
 [0.4.1]: https://github.com/JWalen/VAGScanner/releases/tag/v0.4.1
 [0.4.0]: https://github.com/JWalen/VAGScanner/releases/tag/v0.4.0

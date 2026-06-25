@@ -35,7 +35,8 @@ Write-Host "==> Version: $Version" -ForegroundColor Cyan
 # Ensure build tooling + the project itself are installed.
 Write-Host "==> Installing PyInstaller and the project (with GUI extras)..." -ForegroundColor Cyan
 & $Python -m pip install --upgrade pip pyinstaller | Out-Null
-& $Python -m pip install -e ".[gui]" | Out-Null
+# Install GUI deps plus mcp/certifi so the spec can bundle the MCP server + CA store.
+& $Python -m pip install -e ".[gui]" "mcp>=1.2.0" "certifi>=2023.0" | Out-Null
 
 # 1) PyInstaller bundle.
 Write-Host "==> Running PyInstaller..." -ForegroundColor Cyan

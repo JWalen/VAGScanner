@@ -32,7 +32,17 @@ def qapp():
 
 def test_window_constructs(qapp):
     win = gui_app.MainWindow()
-    assert win.tabs.count() == 2
+    assert win.tabs.count() == 3  # File Analyzer, Live, AI Assistant
+    win.close()
+
+
+def test_ai_tab_builds(qapp):
+    win = gui_app.MainWindow()
+    tab = win.ai_tab
+    assert tab.provider_combo.count() == 3
+    tab.provider_combo.setCurrentIndex(0)
+    assert tab.model_combo.count() >= 1  # provider change populated models
+    assert "Get a key" in tab.key_link.text()
     win.close()
 
 

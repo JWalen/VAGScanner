@@ -228,6 +228,36 @@ def _u(ch) -> str:
     return f" {ch.unit}" if ch.unit else ""
 
 
+def report_to_text(report: "DiagnosticReport", log: Optional[MeasuringLog] = None) -> str:
+    """Render a report as a compact plain-text block (e.g. for an AI prompt)."""
+    lines: List[str] = []
+    if report.vin:
+        lines.append(f"VIN: {report.vin}")
+    if report.mileage:
+        lines.append(f"Mileage: {report.mileage}")
+    lines.append(report.headline)
+    lines.append("")
+    for f in report.findings:
+        lines.append(f"- [{f.severity.upper()}] {f.title}")
+        if f.detail:
+            lines.append(f"    {f.detail}")
+        if f.causes:
+            lines.append("    Likely causes: " + "; ".join(f.causes))
+    if log is not None and log.channels:
+        lines.append("")
+        lines.append("Channels logged (min/max/mean):")
+        for c in log.channels:
+            lines.append(
+                f"  {c.name} [{c.unit}]: "
+                f"{_num(c.min)} / {_num(c.max)} / {_num(c.mean)}"
+            )
+    return "\n".join(lines)
+
+
+def _num(x) -> str:
+    return "?" if x is None else (f"{x:.1f}" if isinstance(x, float) else str(x))
+
+
 def diagnose(scan: Optional[AutoScan] = None, log: Optional[MeasuringLog] = None) -> DiagnosticReport:
     """Build a prioritized diagnostic report from a scan and/or measuring log.
 

@@ -24,7 +24,7 @@ from .parse import (
 )
 from . import compute, knowledge
 from .compute import add_computed_channels
-from .diagnose import DiagnosticReport, Finding, diagnose
+from .diagnose import DiagnosticReport, Finding, diagnose, report_to_text
 from .report import build_html_report, save_html_report
 
 __all__ = [

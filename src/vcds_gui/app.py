@@ -28,8 +28,9 @@ from typing import Dict, List, Optional, Tuple
 
 from vcds_core import compute, knowledge, parse
 from vcds_core.diagnose import diagnose as run_diagnose
+from vcds_core.diagnose import report_to_text
 from vcds_core.report import build_html_report
-from vcds_gui import updater
+from vcds_gui import ai, updater
 from vcds_obd import live
 
 try:
@@ -1361,6 +1362,195 @@ if _HAVE_QT:
             self.results.setPlainText("\n\n".join(lines))
 
     # --------------------------------------------------------------------- #
+    # Tab 3 — AI Assistant
+    # --------------------------------------------------------------------- #
+    class AiChatWorker(QtCore.QObject):
+        done = QtCore.Signal(str)
+        failed = QtCore.Signal(str)
+
+        def __init__(self, provider, key, model, system, messages):
+            super().__init__()
+            self.provider = provider
+            self.key = key
+            self.model = model
+            self.system = system
+            self.messages = messages
+
+        @QtCore.Slot()
+        def run(self):
+            try:
+                reply = ai.chat(self.provider, self.key, self.model, self.system, self.messages)
+                self.done.emit(reply)
+            except Exception as exc:  # noqa: BLE001
+                self.failed.emit(str(exc))
+
+    class AiAssistantTab(QtWidgets.QWidget):
+        def __init__(self, main_window, parent=None):
+            super().__init__(parent)
+            self.main = main_window
+            self.settings = QtCore.QSettings("DeltaModTech", "VCDS Toolkit")
+            self.history: list = []
+            self._thread = None
+            self._worker = None
+            self._build()
+            self._load_provider_settings()
+
+        def _build(self):
+            v = QtWidgets.QVBoxLayout(self)
+
+            cfg = QtWidgets.QHBoxLayout()
+            cfg.addWidget(QtWidgets.QLabel("Provider:"))
+            self.provider_combo = QtWidgets.QComboBox()
+            for pid, prov in ai.PROVIDERS.items():
+                self.provider_combo.addItem(prov.label, pid)
+            cfg.addWidget(self.provider_combo)
+            cfg.addWidget(QtWidgets.QLabel("Model:"))
+            self.model_combo = QtWidgets.QComboBox()
+            self.model_combo.setEditable(True)
+            self.model_combo.setMinimumWidth(190)
+            cfg.addWidget(self.model_combo)
+            cfg.addWidget(QtWidgets.QLabel("API key:"))
+            self.key_edit = QtWidgets.QLineEdit()
+            self.key_edit.setEchoMode(QtWidgets.QLineEdit.Password)
+            self.key_edit.setMinimumWidth(220)
+            cfg.addWidget(self.key_edit, 1)
+            self.btn_save_key = QtWidgets.QPushButton("Save")
+            cfg.addWidget(self.btn_save_key)
+            self.key_link = QtWidgets.QLabel()
+            self.key_link.setOpenExternalLinks(True)
+            cfg.addWidget(self.key_link)
+            v.addLayout(cfg)
+
+            opts = QtWidgets.QHBoxLayout()
+            self.chk_context = QtWidgets.QCheckBox("Include current scan/log data as context")
+            self.chk_context.setChecked(True)
+            opts.addWidget(self.chk_context)
+            opts.addStretch(1)
+            self.btn_clear_chat = QtWidgets.QPushButton("Clear chat")
+            opts.addWidget(self.btn_clear_chat)
+            v.addLayout(opts)
+
+            self.conversation = QtWidgets.QTextBrowser()
+            self.conversation.setOpenExternalLinks(True)
+            v.addWidget(self.conversation, 1)
+
+            entry = QtWidgets.QHBoxLayout()
+            self.input = QtWidgets.QPlainTextEdit()
+            self.input.setPlaceholderText("Ask about the vehicle…  (Ctrl+Enter to send)")
+            self.input.setMaximumHeight(90)
+            entry.addWidget(self.input, 1)
+            self.btn_send = QtWidgets.QPushButton("Send")
+            entry.addWidget(self.btn_send)
+            v.addLayout(entry)
+
+            self.provider_combo.currentIndexChanged.connect(self._provider_changed)
+            self.btn_save_key.clicked.connect(self._save_key)
+            self.btn_send.clicked.connect(self.send)
+            self.btn_clear_chat.clicked.connect(self._clear_chat)
+            send_sc = QtGui.QShortcut(QtGui.QKeySequence("Ctrl+Return"), self.input)
+            send_sc.activated.connect(self.send)
+
+            self._render_intro()
+
+        # -- settings ------------------------------------------------------- #
+        def _provider_changed(self):
+            pid = self.provider_combo.currentData()
+            prov = ai.PROVIDERS[pid]
+            self.model_combo.clear()
+            self.model_combo.addItems(prov.models)
+            saved_model = self.settings.value(f"ai/model/{pid}", prov.default_model, type=str)
+            self.model_combo.setCurrentText(saved_model)
+            self.key_edit.setText(self.settings.value(f"ai/key/{pid}", "", type=str))
+            self.key_link.setText(f"<a href='{prov.key_url}'>Get a key</a>")
+            self.settings.setValue("ai/provider", pid)
+
+        def _load_provider_settings(self):
+            pid = self.settings.value("ai/provider", "anthropic", type=str)
+            idx = self.provider_combo.findData(pid)
+            self.provider_combo.setCurrentIndex(max(0, idx))
+            self._provider_changed()
+
+        def _save_key(self):
+            pid = self.provider_combo.currentData()
+            self.settings.setValue(f"ai/key/{pid}", self.key_edit.text().strip())
+            self.settings.setValue(f"ai/model/{pid}", self.model_combo.currentText().strip())
+            QtWidgets.QMessageBox.information(
+                self, "Saved",
+                "API key saved for this provider.\n\nNote: it is stored locally in your "
+                "user settings (not encrypted).",
+            )
+
+        # -- chat ----------------------------------------------------------- #
+        def _render_intro(self):
+            self.conversation.setHtml(
+                "<p style='color:#718096'>Ask the assistant to help diagnose your car. "
+                "It can use the scan/log currently open in the File Analyzer tab as "
+                "context. Pick a provider, paste an API key, and Save.</p>"
+            )
+
+        def _clear_chat(self):
+            self.history = []
+            self._render_intro()
+
+        def _append(self, who: str, text: str, color: str):
+            safe = (text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                    .replace("\n", "<br>"))
+            self.conversation.append(
+                f"<p><b style='color:{color}'>{who}:</b><br>{safe}</p>"
+            )
+
+        def _build_context(self) -> str:
+            if not self.chk_context.isChecked():
+                return ""
+            analyzer = self.main.analyzer
+            scan = getattr(analyzer, "scan", None)
+            log = getattr(analyzer, "mlog", None)
+            if scan is None and log is None:
+                return ""
+            report = run_diagnose(scan=scan, log=log)
+            return report_to_text(report, log=log)
+
+        def send(self):
+            text = self.input.toPlainText().strip()
+            if not text:
+                return
+            pid = self.provider_combo.currentData()
+            key = self.key_edit.text().strip()
+            if not key:
+                QtWidgets.QMessageBox.warning(self, "No API key", "Enter and Save an API key first.")
+                return
+            model = self.model_combo.currentText().strip()
+            self.history.append({"role": "user", "content": text})
+            self._append("You", text, "#0066CC")
+            self.input.clear()
+            self.btn_send.setEnabled(False)
+            self.conversation.append("<p style='color:#718096'><i>Thinking…</i></p>")
+
+            system = ai.vehicle_system_prompt(self._build_context())
+            self._thread = QtCore.QThread()
+            self._worker = AiChatWorker(pid, key, model, system, list(self.history))
+            self._worker.moveToThread(self._thread)
+            self._thread.started.connect(self._worker.run)
+            self._worker.done.connect(self._on_reply)
+            self._worker.failed.connect(self._on_error)
+            self._worker.done.connect(self._thread.quit)
+            self._worker.failed.connect(self._thread.quit)
+            self._thread.start()
+
+        @QtCore.Slot(str)
+        def _on_reply(self, reply):
+            self.history.append({"role": "assistant", "content": reply})
+            self._append("Assistant", reply, "#00897B")
+            self.btn_send.setEnabled(True)
+
+        @QtCore.Slot(str)
+        def _on_error(self, msg):
+            self.conversation.append(
+                f"<p style='color:#E53E3E'><b>Error:</b> {msg}</p>"
+            )
+            self.btn_send.setEnabled(True)
+
+    # --------------------------------------------------------------------- #
     # Main window
     # --------------------------------------------------------------------- #
     class MainWindow(QtWidgets.QMainWindow):
@@ -1392,8 +1582,10 @@ if _HAVE_QT:
 
             self.analyzer = FileAnalyzerTab()
             self.live_tab = LiveTab(self)
+            self.ai_tab = AiAssistantTab(self)
             self.tabs.addTab(self.analyzer, "File Analyzer")
             self.tabs.addTab(self.live_tab, "Live (OBD-II)")
+            self.tabs.addTab(self.ai_tab, "AI Assistant")
 
             self.settings = QtCore.QSettings("DeltaModTech", "VCDS Toolkit")
             self._build_menu()
