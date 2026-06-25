@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-06-25
+
+### Added
+- **Garage** (Tools → Garage…): save multiple vehicles by **VIN** with make /
+  year / brand profile, a nickname and mass, and a per-vehicle **session
+  history**. Set an **active vehicle** (which applies its brand profile). Reading
+  **Vehicle Info** auto-adds the car and makes it active; finished live sessions
+  are recorded under it (`vcds_core.garage`).
+
 ## [0.17.0] - 2026-06-25
 
 ### Added
@@ -280,7 +289,8 @@ First public release.
   installer, and publishes a GitHub Release on each `v*` tag.
 - 54-test pytest suite (no hardware; the live path is mocked).
 
-[Unreleased]: https://github.com/JWalen/VAGScanner/compare/v0.17.0...HEAD
+[Unreleased]: https://github.com/JWalen/VAGScanner/compare/v0.18.0...HEAD
+[0.18.0]: https://github.com/JWalen/VAGScanner/releases/tag/v0.18.0
 [0.17.0]: https://github.com/JWalen/VAGScanner/releases/tag/v0.17.0
 [0.16.0]: https://github.com/JWalen/VAGScanner/releases/tag/v0.16.0
 [0.15.0]: https://github.com/JWalen/VAGScanner/releases/tag/v0.15.0

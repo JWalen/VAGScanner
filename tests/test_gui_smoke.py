@@ -306,6 +306,19 @@ def test_pdf_export_path(qapp, tmp_path, samples_dir):
     assert out.is_file() and out.stat().st_size > 0
 
 
+def test_garage_dialog_builds(qapp, tmp_path, monkeypatch):
+    win = gui_app.MainWindow()
+    monkeypatch.setattr(gui_app.GarageDialog, "GARAGE_PATH", str(tmp_path / "garage.json"))
+    dlg = gui_app.GarageDialog(win)
+    # seed a vehicle and refill
+    from vcds_core import garage
+    dlg.vehicles.append(garage.Vehicle(vin="WAUZZZ8K9BA123456", make="Audi", year=2011,
+                                       brand_profile="vag"))
+    dlg._fill()
+    assert dlg.list.count() == 1
+    win.close()
+
+
 def test_vehicle_info_dialog_builds(qapp):
     from vcds_core.vin import decode_vin
 

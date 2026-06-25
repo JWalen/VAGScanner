@@ -22,7 +22,9 @@ from .parse import (
     parse_autoscan,
     parse_measuring_log,
 )
-from . import compare, compute, importers, knowledge, perform, profiles, trip, units, vin
+from . import (
+    compare, compute, garage, importers, knowledge, perform, profiles, trip, units, vin,
+)
 from .compare import compare_logs
 from .importers import import_generic_csv, open_measuring_file
 from .compute import add_computed_channels

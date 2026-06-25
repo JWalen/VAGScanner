@@ -27,7 +27,8 @@ import time
 from typing import Dict, List, Optional, Tuple
 
 from vcds_core import compare as compare_mod
-from vcds_core import compute, knowledge, parse, perform, profiles, trip, units
+from vcds_core import compute, garage as garage_mod
+from vcds_core import knowledge, parse, perform, profiles, trip, units
 from vcds_core.diagnose import diagnose as run_diagnose
 from vcds_core.diagnose import report_to_text
 from vcds_core.importers import open_measuring_file
@@ -974,9 +975,17 @@ if _HAVE_QT:
                 perm = []
             info = vinmod.decode_vin(vstr) if vstr else None
             VehicleInfoDialog(vstr, info, cals, readiness, perm, self).exec()
-            # Auto-select the brand profile from the VIN.
+            # Auto-select the brand profile from the VIN, and add to the garage.
             if info and info.brand_profile != "generic":
                 self.main._set_profile(info.brand_profile)
+            if vstr and info:
+                path = os.path.join(DEFAULT_LOGS_DIR, "garage.json")
+                vehicles = garage_mod.load_garage(path)
+                garage_mod.add_or_update(vehicles, garage_mod.Vehicle(
+                    vin=info.vin, make=info.make, year=info.year,
+                    brand_profile=info.brand_profile))
+                garage_mod.save_garage(path, vehicles)
+                self.main.settings.setValue("garage/active_vin", info.vin)
 
         # -- triggers ------------------------------------------------------- #
         def _add_trigger_rule(self):
@@ -1117,6 +1126,13 @@ if _HAVE_QT:
             self.run_status.setText(
                 f"Saved {os.path.basename(result.session_file)} ({result.sample_count} samples)."
             )
+            # Record the session under the active garage vehicle, if any.
+            active = self.main.settings.value("garage/active_vin", "", type=str)
+            if active:
+                path = os.path.join(DEFAULT_LOGS_DIR, "garage.json")
+                vehicles = garage_mod.load_garage(path)
+                if garage_mod.add_session(vehicles, active, os.path.basename(result.session_file)):
+                    garage_mod.save_garage(path, vehicles)
             for cap in result.captures:
                 item = QtWidgets.QListWidgetItem(
                     f"{os.path.basename(cap.file)} — {cap.trigger_kind} @ {cap.trigger_time:.1f}s"
@@ -2183,6 +2199,97 @@ if _HAVE_QT:
             )
             self.btn_send.setEnabled(True)
 
+    class GarageDialog(QtWidgets.QDialog):
+        """Manage saved vehicles (per VIN) and pick the active one."""
+
+        GARAGE_PATH = os.path.join(DEFAULT_LOGS_DIR, "garage.json")
+
+        def __init__(self, main_window, parent=None):
+            super().__init__(parent)
+            self.main = main_window
+            self.vehicles = garage_mod.load_garage(self.GARAGE_PATH)
+            self.setWindowTitle("Garage")
+            self.resize(720, 440)
+            v = QtWidgets.QVBoxLayout(self)
+            self.list = QtWidgets.QListWidget()
+            v.addWidget(self.list, 1)
+            self._fill()
+
+            bar = QtWidgets.QHBoxLayout()
+            for label, slot in (("Add by VIN…", self._add), ("Set Active", self._set_active),
+                                ("Edit…", self._edit), ("Remove", self._remove)):
+                b = QtWidgets.QPushButton(label)
+                b.clicked.connect(slot)
+                bar.addWidget(b)
+            bar.addStretch(1)
+            v.addLayout(bar)
+            buttons = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Close)
+            buttons.rejected.connect(self.reject)
+            buttons.accepted.connect(self.accept)
+            v.addWidget(buttons)
+
+        def _fill(self):
+            self.list.clear()
+            active = self.main.settings.value("garage/active_vin", "", type=str)
+            for veh in self.vehicles:
+                star = "★ " if veh.vin.upper() == active.upper() else ""
+                it = QtWidgets.QListWidgetItem(
+                    f"{star}{veh.label}  —  {veh.vin}  ({veh.brand_profile})  "
+                    f"[{len(veh.sessions)} sessions]")
+                it.setData(QtCore.Qt.UserRole, veh.vin)
+                self.list.addItem(it)
+
+        def _selected(self):
+            it = self.list.currentItem()
+            return garage_mod.find(self.vehicles, it.data(QtCore.Qt.UserRole)) if it else None
+
+        def _save(self):
+            garage_mod.save_garage(self.GARAGE_PATH, self.vehicles)
+
+        def _add(self):
+            from vcds_core import vin as vinmod
+            text, ok = QtWidgets.QInputDialog.getText(self, "Add vehicle", "VIN:")
+            if not ok or not text.strip():
+                return
+            info = vinmod.decode_vin(text.strip())
+            garage_mod.add_or_update(self.vehicles, garage_mod.Vehicle(
+                vin=info.vin, make=info.make, year=info.year, brand_profile=info.brand_profile))
+            self._save()
+            self._fill()
+
+        def _set_active(self):
+            veh = self._selected()
+            if not veh:
+                return
+            self.main.settings.setValue("garage/active_vin", veh.vin)
+            if veh.brand_profile != "generic":
+                self.main._set_profile(veh.brand_profile)
+            self.main.statusBar().showMessage(f"Active vehicle: {veh.label}", 4000)
+            self._fill()
+
+        def _edit(self):
+            veh = self._selected()
+            if not veh:
+                return
+            nick, ok = QtWidgets.QInputDialog.getText(
+                self, "Nickname", f"Nickname for {veh.vin}:", text=veh.nickname)
+            if ok:
+                veh.nickname = nick.strip()
+            mass, ok = QtWidgets.QInputDialog.getDouble(
+                self, "Mass", "Vehicle mass (kg, 0 = unknown):", veh.mass_kg or 0.0, 0, 5000, 0)
+            if ok:
+                veh.mass_kg = mass or None
+            self._save()
+            self._fill()
+
+        def _remove(self):
+            veh = self._selected()
+            if not veh:
+                return
+            self.vehicles = [x for x in self.vehicles if x.vin != veh.vin]
+            self._save()
+            self._fill()
+
     class VehicleInfoDialog(QtWidgets.QDialog):
         """Shows VIN/decode, calibration IDs, I/M readiness and permanent DTCs."""
 
@@ -2400,6 +2507,9 @@ if _HAVE_QT:
             enh_action = QtGui.QAction("&Enhanced PIDs (experimental)…", self)
             enh_action.triggered.connect(self.show_enhanced_pids)
             tools_menu.addAction(enh_action)
+            garage_action = QtGui.QAction("&Garage…", self)
+            garage_action.triggered.connect(self.show_garage)
+            tools_menu.addAction(garage_action)
 
             help_menu = self.menuBar().addMenu("&Help")
             tour = QtGui.QAction("&Quick Tour", self)
@@ -2476,6 +2586,9 @@ if _HAVE_QT:
 
         def show_enhanced_pids(self):
             EnhancedPidsDialog(self, self).exec()
+
+        def show_garage(self):
+            GarageDialog(self, self).exec()
 
         def show_help(self):
             HelpDialog(self._version, self).exec()
