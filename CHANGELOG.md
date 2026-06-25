@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-06-24
+
+### Added
+- **Session comparison** (`vcds_core.compare`): open a second log and compare it
+  to the current one channel-by-channel — A/B min/max/mean with colour-coded
+  deltas (Δ = B − A). Surfaced via a "⇄ Compare…" button in the File Analyzer.
+  Great for before/after a repair or tune, or pull-vs-pull.
+
 ## [0.7.0] - 2026-06-24
 
 ### Added
@@ -155,7 +163,8 @@ First public release.
   installer, and publishes a GitHub Release on each `v*` tag.
 - 54-test pytest suite (no hardware; the live path is mocked).
 
-[Unreleased]: https://github.com/JWalen/VAGScanner/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/JWalen/VAGScanner/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/JWalen/VAGScanner/releases/tag/v0.8.0
 [0.7.0]: https://github.com/JWalen/VAGScanner/releases/tag/v0.7.0
 [0.6.0]: https://github.com/JWalen/VAGScanner/releases/tag/v0.6.0
 [0.5.0]: https://github.com/JWalen/VAGScanner/releases/tag/v0.5.0

@@ -144,6 +144,23 @@ def test_performance_dialog_builds(qapp, tmp_path):
     win.close()
 
 
+def test_compare_dialog_builds(qapp, tmp_path):
+    from PySide6 import QtWidgets
+    from vcds_core.compare import compare_logs
+
+    a = tmp_path / "a.csv"
+    a.write_text("TIME,Boost\ns,mbar\n0,1000\n1,1100\n2,1050\n", encoding="utf-8")
+    b = tmp_path / "b.csv"
+    b.write_text("TIME,Boost\ns,mbar\n0,1200\n1,1300\n2,1250\n", encoding="utf-8")
+    win = gui_app.MainWindow()
+    win.analyzer.load_csv(str(a))
+    comp = compare_logs(win.analyzer.mlog, parse.parse_measuring_log(str(b)))
+    dlg = gui_app.CompareDialog(comp)
+    table = dlg.findChild(QtWidgets.QTableWidget)
+    assert table is not None and table.rowCount() >= 1
+    win.close()
+
+
 def test_diagnosis_dialog_builds(qapp, samples_dir):
     from vcds_core.diagnose import diagnose as run_diagnose
 

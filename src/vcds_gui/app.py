@@ -26,6 +26,7 @@ import threading
 import time
 from typing import Dict, List, Optional, Tuple
 
+from vcds_core import compare as compare_mod
 from vcds_core import compute, knowledge, parse, perform
 from vcds_core.diagnose import diagnose as run_diagnose
 from vcds_core.diagnose import report_to_text
@@ -229,9 +230,11 @@ if _HAVE_QT:
             self.btn_diagnose.setToolTip("Analyze the loaded log and/or Auto-Scan for likely faults")
             self.btn_perf = QtWidgets.QPushButton("📈 Performance")
             self.btn_perf.setToolTip("Acceleration runs, pulls and an estimated power figure")
+            self.btn_compare = QtWidgets.QPushButton("⇄ Compare…")
+            self.btn_compare.setToolTip("Open a second log and compare it (before/after)")
             self.lbl_info = QtWidgets.QLabel("No file loaded.")
             for w in (self.btn_open, self.btn_scan, self.btn_diagnose, self.btn_perf,
-                      self.chk_norm, self.btn_export):
+                      self.btn_compare, self.chk_norm, self.btn_export):
                 bar.addWidget(w)
             bar.addWidget(self.lbl_info, 1)
             outer.addLayout(bar)
@@ -301,6 +304,7 @@ if _HAVE_QT:
             self.btn_export.clicked.connect(self.export_view)
             self.btn_diagnose.clicked.connect(self.run_diagnosis)
             self.btn_perf.clicked.connect(self.run_performance)
+            self.btn_compare.clicked.connect(self.open_compare)
             self.chan_list.itemChanged.connect(self._chan_toggled)
             self.btn_find.clicked.connect(lambda: self.run_events(use_rules=False))
             self.btn_apply_rules.clicked.connect(lambda: self.run_events(use_rules=True))
@@ -412,6 +416,27 @@ if _HAVE_QT:
                 QtWidgets.QMessageBox.information(self, "Performance", "Open a measuring CSV first.")
                 return
             PerformanceDialog(self.mlog, self).exec()
+
+        def open_compare(self):
+            if self.mlog is None:
+                QtWidgets.QMessageBox.information(
+                    self, "Compare", "Open a measuring CSV first — that becomes log A.")
+                return
+            path, _ = QtWidgets.QFileDialog.getOpenFileName(
+                self, "Open second CSV to compare (log B)", DEFAULT_LOGS_DIR,
+                "CSV files (*.csv *.CSV);;All files (*)")
+            if not path:
+                return
+            try:
+                other = parse.parse_measuring_log(path)
+                compute.add_computed_channels(other)
+            except Exception as exc:  # noqa: BLE001
+                QtWidgets.QMessageBox.critical(self, "Parse error", str(exc))
+                return
+            comparison = compare_mod.compare_logs(
+                self.mlog, other,
+                a_name=os.path.basename(self.mlog.file), b_name=os.path.basename(path))
+            CompareDialog(comparison, self).exec()
 
         # -- channel toggling ---------------------------------------------- #
         def _chan_toggled(self, item: "QtWidgets.QListWidgetItem"):
@@ -1007,6 +1032,54 @@ if _HAVE_QT:
         "critical": "#E53E3E", "high": "#DD6B20", "medium": "#D69E2E",
         "low": "#3182CE", "info": "#718096",
     }
+
+    class CompareDialog(QtWidgets.QDialog):
+        """Before/after stats table for two logs (A = current, B = opened)."""
+
+        def __init__(self, comparison, parent=None):
+            super().__init__(parent)
+            self.setWindowTitle(f"Compare — {comparison.a_name}  vs  {comparison.b_name}")
+            self.resize(860, 600)
+            v = QtWidgets.QVBoxLayout(self)
+            v.addWidget(QtWidgets.QLabel(
+                f"<b>A:</b> {comparison.a_name} &nbsp;&nbsp; <b>B:</b> {comparison.b_name} "
+                "&nbsp;&nbsp;<span style='color:#718096'>(Δ = B − A)</span>"))
+
+            cols = ["Channel", "Unit", "A mean", "B mean", "Δ mean", "A max", "B max", "Δ max"]
+            table = QtWidgets.QTableWidget(len(comparison.channels), len(cols))
+            table.setHorizontalHeaderLabels(cols)
+            table.setEditTriggers(QtWidgets.QTableWidget.NoEditTriggers)
+            for r, d in enumerate(comparison.channels):
+                table.setItem(r, 0, QtWidgets.QTableWidgetItem(d.name))
+                table.setItem(r, 1, QtWidgets.QTableWidgetItem(d.unit))
+                table.setItem(r, 2, self._num(d.a_mean))
+                table.setItem(r, 3, self._num(d.b_mean))
+                table.setItem(r, 4, self._delta(d.d_mean))
+                table.setItem(r, 5, self._num(d.a_max))
+                table.setItem(r, 6, self._num(d.b_max))
+                table.setItem(r, 7, self._delta(d.d_max))
+            table.resizeColumnsToContents()
+            table.horizontalHeader().setStretchLastSection(True)
+            v.addWidget(table, 1)
+
+            buttons = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Close)
+            buttons.rejected.connect(self.reject)
+            buttons.accepted.connect(self.accept)
+            v.addWidget(buttons)
+
+        @staticmethod
+        def _num(x):
+            it = QtWidgets.QTableWidgetItem("—" if x is None else f"{x:.2f}")
+            it.setTextAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
+            return it
+
+        @staticmethod
+        def _delta(x):
+            it = QtWidgets.QTableWidgetItem("—" if x is None else f"{x:+.2f}")
+            it.setTextAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
+            if x is not None and abs(x) > 1e-9:
+                it.setForeground(QtGui.QColor("#38A169" if x > 0 else "#E53E3E"))
+            return it
 
     class PerformanceDialog(QtWidgets.QDialog):
         """Acceleration runs, WOT pulls and an estimated power/torque figure."""
