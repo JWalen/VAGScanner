@@ -85,6 +85,28 @@ jobs:
         shell: pwsh
         run: .\installer\build_installer.ps1 -Python python
 
+      - name: Sign installer (only if a cert is configured)
+        shell: pwsh
+        env:
+          PFX_B64: ${{ secrets.SIGNING_PFX_BASE64 }}
+          PFX_PW: ${{ secrets.SIGNING_PASSWORD }}
+        run: |
+          if (-not $env:PFX_B64) {
+            Write-Host "No SIGNING_PFX_BASE64 secret set — shipping unsigned (this is fine)."
+            exit 0
+          }
+          $pfx = Join-Path $env:RUNNER_TEMP "codesign.pfx"
+          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:PFX_B64))
+          $setup = (Get-ChildItem installer\Output\*.exe | Select-Object -First 1).FullName
+          $signtool = (Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin" -Recurse -Filter signtool.exe |
+            Where-Object { $_.FullName -match '\\x64\\' } | Select-Object -Last 1).FullName
+          & $signtool sign /f $pfx /p $env:PFX_PW /fd sha256 `
+            /tr http://timestamp.digicert.com /td sha256 $setup
+          if ($LASTEXITCODE -ne 0) { throw "signtool failed" }
+          & $signtool verify /pa $setup
+          Remove-Item $pfx -Force
+          Write-Host "Signed: $setup"
+
       - name: Create GitHub Release
         shell: bash
         env:

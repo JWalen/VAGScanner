@@ -53,5 +53,48 @@ iscc installer\vcds-toolkit.iss /DMyAppVersion=0.1.0
 - **Releases** — the GitHub Actions release workflow builds this installer and
   attaches `VCDS-Toolkit-Setup-<version>.exe` to each tagged release
   automatically (requires Inno Setup on the runner, installed via Chocolatey).
-- **Code signing** — unsigned installers trigger a SmartScreen warning. To sign,
-  add a `signtool` step after the `iscc` compile with your code-signing cert.
+## Code signing
+
+The release workflow signs the installer **automatically when a cert is
+configured** — otherwise it ships unsigned (today's behaviour). To turn signing
+on, add two repository secrets (Settings → Secrets and variables → Actions):
+
+- `SIGNING_PFX_BASE64` — your code-signing `.pfx`, base64-encoded
+- `SIGNING_PASSWORD` — the `.pfx` password
+
+Encode the `.pfx`:
+
+```powershell
+[Convert]::ToBase64String([IO.File]::ReadAllBytes("mycert.pfx")) | Set-Clipboard
+```
+
+### Free, internal option — self-signed + deploy to your fleet
+Best for an internal tool on managed (Intune/GPO) machines. Removes the
+SmartScreen prompt on machines that trust your cert.
+
+```powershell
+# 1. create the cert
+$c = New-SelfSignedCertificate -Type CodeSigningCert -Subject "CN=DeltaModTech" `
+     -CertStoreLocation Cert:\CurrentUser\My -KeyExportPolicy Exportable `
+     -KeyUsage DigitalSignature -FriendlyName "DeltaModTech Code Signing"
+# 2. export the private .pfx (for signing) and the public .cer (for trust)
+Export-PfxCertificate -Cert $c -FilePath deltamodtech.pfx `
+     -Password (ConvertTo-SecureString "CHANGEME" -AsPlainText -Force)
+Export-Certificate -Cert $c -FilePath deltamodtech.cer
+```
+
+Then base64 the `.pfx` into `SIGNING_PFX_BASE64`, set `SIGNING_PASSWORD`, and push
+`deltamodtech.cer` to **Trusted Publishers** (and Trusted Root) on staff machines
+via Intune/Group Policy. The next tagged release is signed; managed machines stop
+prompting. (Un-managed PCs still warn — expected for a self-signed cert.)
+
+### Public trust
+For an installer trusted on **any** Windows PC, use a publicly-trusted cert.
+Note: since June 2023 these must be on FIPS hardware or a cloud signing service —
+you can't get a plain `.pfx` from a CA anymore. Good options:
+
+- **Azure Trusted Signing** (~$10/mo, cloud, great CI support, good SmartScreen
+  reputation). Swap the signing step for `azure/trusted-signing-action` and add
+  the Azure secrets instead of the `.pfx` ones.
+- **EV cert** (SSL.com / DigiCert / Certum cloud signing) — instant SmartScreen
+  reputation, ~$200–600/yr.
