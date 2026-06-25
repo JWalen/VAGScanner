@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-06-24
+
+### Added
+- **PID presets** in the Live tab: save the currently-checked PIDs under a name
+  and re-apply them later (e.g. a "Boost diagnosis" or "Fueling" set), stored in
+  local settings.
+
 ## [0.9.0] - 2026-06-24
 
 ### Added
@@ -174,7 +181,8 @@ First public release.
   installer, and publishes a GitHub Release on each `v*` tag.
 - 54-test pytest suite (no hardware; the live path is mocked).
 
-[Unreleased]: https://github.com/JWalen/VAGScanner/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/JWalen/VAGScanner/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/JWalen/VAGScanner/releases/tag/v0.10.0
 [0.9.0]: https://github.com/JWalen/VAGScanner/releases/tag/v0.9.0
 [0.8.0]: https://github.com/JWalen/VAGScanner/releases/tag/v0.8.0
 [0.7.0]: https://github.com/JWalen/VAGScanner/releases/tag/v0.7.0

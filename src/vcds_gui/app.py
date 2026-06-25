@@ -620,7 +620,10 @@ if _HAVE_QT:
             self.logger: Optional[live.LiveLogger] = None
             self.trigger_rules: List[dict] = []
             self._gauges = None
+            self.settings = QtCore.QSettings("DeltaModTech", "VCDS Toolkit")
+            self._presets: dict = {}
             self._build()
+            self._load_presets()
 
         def _build(self):
             outer = QtWidgets.QVBoxLayout(self)
@@ -678,6 +681,21 @@ if _HAVE_QT:
             pid_btns.addWidget(self.btn_pid_none)
             pid_btns.addWidget(self.lbl_pid_count, 1)
             pv.addLayout(pid_btns)
+
+            preset_row = QtWidgets.QHBoxLayout()
+            preset_row.addWidget(QtWidgets.QLabel("Preset:"))
+            self.preset_combo = QtWidgets.QComboBox()
+            self.preset_combo.setMinimumWidth(120)
+            self.btn_preset_save = QtWidgets.QPushButton("Save…")
+            self.btn_preset_del = QtWidgets.QPushButton("Delete")
+            preset_row.addWidget(self.preset_combo, 1)
+            preset_row.addWidget(self.btn_preset_save)
+            preset_row.addWidget(self.btn_preset_del)
+            pv.addLayout(preset_row)
+            self.preset_combo.currentTextChanged.connect(self._apply_preset)
+            self.btn_preset_save.clicked.connect(self._save_preset)
+            self.btn_preset_del.clicked.connect(self._delete_preset)
+
             left_split.addWidget(pid_box)
 
             trig_box = QtWidgets.QGroupBox("Event-capture trigger")
@@ -833,6 +851,59 @@ if _HAVE_QT:
                 if self.pid_list.item(i).checkState() == QtCore.Qt.Checked
             )
             self.lbl_pid_count.setText(f"{checked} selected / {total}")
+
+        # -- PID presets ---------------------------------------------------- #
+        def _load_presets(self):
+            import json
+
+            raw = self.settings.value("live/presets", "", type=str)
+            try:
+                self._presets = json.loads(raw) if raw else {}
+            except ValueError:
+                self._presets = {}
+            self.preset_combo.blockSignals(True)
+            self.preset_combo.clear()
+            self.preset_combo.addItem("—")
+            for name in sorted(self._presets):
+                self.preset_combo.addItem(name)
+            self.preset_combo.blockSignals(False)
+
+        def _save_preset(self):
+            import json
+
+            chosen = [self.pid_list.item(i).data(QtCore.Qt.UserRole)
+                      for i in range(self.pid_list.count())
+                      if self.pid_list.item(i).checkState() == QtCore.Qt.Checked]
+            if not chosen:
+                QtWidgets.QMessageBox.information(self, "Preset", "Check some PIDs first.")
+                return
+            name, ok = QtWidgets.QInputDialog.getText(self, "Save preset", "Preset name:")
+            if not ok or not name.strip():
+                return
+            self._presets[name.strip()] = chosen
+            self.settings.setValue("live/presets", json.dumps(self._presets))
+            self._load_presets()
+            self.preset_combo.setCurrentText(name.strip())
+
+        def _apply_preset(self, name):
+            if name not in self._presets:
+                return
+            wanted = set(self._presets[name])
+            for i in range(self.pid_list.count()):
+                it = self.pid_list.item(i)
+                it.setCheckState(
+                    QtCore.Qt.Checked if it.data(QtCore.Qt.UserRole) in wanted
+                    else QtCore.Qt.Unchecked
+                )
+
+        def _delete_preset(self):
+            import json
+
+            name = self.preset_combo.currentText()
+            if name in self._presets:
+                del self._presets[name]
+                self.settings.setValue("live/presets", json.dumps(self._presets))
+                self._load_presets()
 
         def disconnect_adapter(self):
             if self.conn is not None:

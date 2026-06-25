@@ -166,6 +166,29 @@ def test_measure_mode_two_cursors(qapp, tmp_path):
     win.close()
 
 
+def test_live_pid_presets(qapp, tmp_path):
+    from PySide6 import QtCore, QtWidgets
+
+    win = gui_app.MainWindow()
+    tab = win.live_tab
+    # isolate settings to a temp file so we don't touch the user's registry
+    tab.settings = QtCore.QSettings(str(tmp_path / "s.ini"), QtCore.QSettings.IniFormat)
+    for name, checked in [("Engine RPM", True), ("Coolant Temp", False), ("MAF", True)]:
+        it = QtWidgets.QListWidgetItem(name)
+        it.setFlags(it.flags() | QtCore.Qt.ItemIsUserCheckable)
+        it.setCheckState(QtCore.Qt.Checked if checked else QtCore.Qt.Unchecked)
+        it.setData(QtCore.Qt.UserRole, name)
+        tab.pid_list.addItem(it)
+
+    tab._presets["MyPull"] = ["Engine RPM", "MAF"]
+    tab._apply_preset("MyPull")
+    states = {tab.pid_list.item(i).data(QtCore.Qt.UserRole):
+              tab.pid_list.item(i).checkState() == QtCore.Qt.Checked
+              for i in range(tab.pid_list.count())}
+    assert states == {"Engine RPM": True, "Coolant Temp": False, "MAF": True}
+    win.close()
+
+
 def test_live_gauges_window(qapp):
     win = gui_app.MainWindow()
     tab = win.live_tab
