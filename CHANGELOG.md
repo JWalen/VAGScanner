@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-06-25
+
+### Fixed
+- **Installer could leave a second copy** alongside an older version (per-user vs
+  per-machine), so the launched app sometimes still showed the old version. The
+  installer now always installs **per-user** and **removes any previous install
+  first**, so updates replace the old app cleanly.
+
 ## [1.0.0] - 2026-06-25
 
 First stable release. A full-featured, multi-brand OBD-II / VAG desktop app with
@@ -339,7 +347,8 @@ First public release.
   installer, and publishes a GitHub Release on each `v*` tag.
 - 54-test pytest suite (no hardware; the live path is mocked).
 
-[Unreleased]: https://github.com/JWalen/VAGScanner/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/JWalen/VAGScanner/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/JWalen/VAGScanner/releases/tag/v1.0.1
 [1.0.0]: https://github.com/JWalen/VAGScanner/releases/tag/v1.0.0
 [0.21.0]: https://github.com/JWalen/VAGScanner/releases/tag/v0.21.0
 [0.20.0]: https://github.com/JWalen/VAGScanner/releases/tag/v0.20.0

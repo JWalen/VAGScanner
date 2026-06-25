@@ -30,8 +30,8 @@ AppSupportURL={#MyAppURL}
 DefaultDirName={autopf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
-; Install per-user by default so no admin rights are required.
-PrivilegesRequiredOverridesAllowed=dialog
+; Always install per-user (no admin needed) so every install/upgrade lands in the
+; SAME location and replaces cleanly — avoids parallel per-user/per-machine copies.
 PrivilegesRequired=lowest
 OutputDir=Output
 OutputBaseFilename=VCDS-Toolkit-Setup-{#MyAppVersion}
@@ -64,3 +64,37 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: de
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
+
+[Code]
+{ Remove any previous install (either per-user or per-machine) before installing,
+  so an upgrade never ends up as a parallel copy alongside the old version. }
+function GetUninstaller(RootKey: Integer): String;
+var
+  s: String;
+begin
+  s := '';
+  RegQueryStringValue(RootKey,
+    'Software\Microsoft\Windows\CurrentVersion\Uninstall\{B8E5B7B2-4C2A-4F1E-9C3D-VCDSTOOLKIT01}_is1',
+    'UninstallString', s);
+  Result := s;
+end;
+
+procedure RunPrevUninstaller(RootKey: Integer);
+var
+  s: String;
+  rc: Integer;
+begin
+  s := GetUninstaller(RootKey);
+  if s = '' then
+    Exit;
+  if (Length(s) >= 2) and (s[1] = '"') then
+    s := Copy(s, 2, Length(s) - 2);
+  Exec(s, '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART', '', SW_HIDE, ewWaitUntilTerminated, rc);
+end;
+
+function InitializeSetup(): Boolean;
+begin
+  RunPrevUninstaller(HKEY_CURRENT_USER);
+  RunPrevUninstaller(HKEY_LOCAL_MACHINE);
+  Result := True;
+end;
