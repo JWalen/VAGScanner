@@ -57,35 +57,44 @@ def test_dashboard_refresh(qapp):
 def test_ai_tab_builds(qapp):
     win = gui_app.MainWindow()
     tab = win.ai_tab
-    assert tab.provider_combo.count() == 3
-    tab.provider_combo.setCurrentIndex(0)
-    assert tab.model_combo.count() >= 1  # provider change populated models
-    assert "Get a key" in tab.key_link.text()
-    assert tab.chk_tools.isChecked()  # AI-browses-logs toggle present
+    assert tab.chk_tools.isChecked()  # AI-uses-tools toggle present
     assert isinstance(tab.input, gui_app.ChatInput)
+    assert tab.chat_list is not None and tab.btn_new is not None  # multi-chat UI
+    assert "🤖" in tab.model_label.text()                          # model header
     win.close()
 
 
-def test_ai_per_vehicle_memory(qapp, tmp_path, monkeypatch):
-    from vcds_core import garage
-    gpath = str(tmp_path / "garage.json")
-    garage.save_garage(gpath, [garage.Vehicle(
-        vin="WAUZZZ8K9BA123456", make="Audi", year=2011, brand_profile="vag",
-        chat=[{"role": "user", "content": "prev"}, {"role": "assistant", "content": "hello"}])])
+def test_ai_settings_dialog(qapp):
+    settings = gui_app.QtCore.QSettings("DeltaModTech", "VCDS Toolkit")
+    dlg = gui_app.AiSettingsDialog(settings)
+    assert dlg.provider_combo.count() == 3
+    dlg.provider_combo.setCurrentIndex(0)
+    assert dlg.model_combo.count() >= 1
+    assert "API key" in dlg.key_link.text() or "key" in dlg.key_link.text().lower()
+    dlg.key_edit.setText("test-key-123")
+    dlg._save()  # persists provider/model/key
+    pid = settings.value("ai/provider", "", type=str)
+    assert settings.value(f"ai/key/{pid}", "", type=str) == "test-key-123"
+    settings.setValue(f"ai/key/{pid}", "")  # cleanup
 
+
+def test_ai_multi_chat(qapp, tmp_path, monkeypatch):
+    monkeypatch.setattr(gui_app, "DEFAULT_LOGS_DIR", str(tmp_path))
     win = gui_app.MainWindow()
     tab = win.ai_tab
-    monkeypatch.setattr(tab, "_garage_path", lambda: gpath)
-    tab.settings.setValue("garage/active_vin", "WAUZZZ8K9BA123456")
-    tab._active_vin = None
-    tab.refresh_vehicle()
-    assert len(tab.history) == 2 and "Audi" in tab.veh_label.text()
-
-    tab.history.append({"role": "user", "content": "new q"})
-    tab._save_vehicle_chat()
-    reloaded = garage.get_chat(garage.load_garage(gpath), "WAUZZZ8K9BA123456")
-    assert reloaded[-1]["content"] == "new q"
-    tab.settings.setValue("garage/active_vin", "")
+    monkeypatch.setattr(tab, "_chats_path", lambda: str(tmp_path / "ai_chats.json"))
+    tab.chats = []
+    tab._new_chat()
+    tab.history.append({"role": "user", "content": "first question about boost"})
+    tab.current["title"] = "first question about boost"
+    tab._save_chats()
+    # a second chat
+    tab._new_chat()
+    assert len(tab.chats) == 2 and tab.chat_list.count() == 2
+    # reload from disk persists
+    import json
+    data = json.load(open(str(tmp_path / "ai_chats.json"), encoding="utf-8"))
+    assert any(c.get("title") == "first question about boost" for c in data)
     win.close()
 
 

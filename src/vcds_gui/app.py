@@ -2734,69 +2734,116 @@ if _HAVE_QT:
             except Exception as exc:  # noqa: BLE001
                 self.failed.emit(str(exc))
 
+    class AiSettingsDialog(QtWidgets.QDialog):
+        """Provider / model / API-key configuration (kept off the chat page)."""
+
+        def __init__(self, settings, parent=None):
+            super().__init__(parent)
+            self.settings = settings
+            self.setWindowTitle("AI Settings")
+            self.resize(540, 240)
+            form = QtWidgets.QFormLayout(self)
+            self.provider_combo = QtWidgets.QComboBox()
+            for pid, prov in ai.PROVIDERS.items():
+                self.provider_combo.addItem(prov.label, pid)
+            form.addRow("Provider:", self.provider_combo)
+            self.model_combo = QtWidgets.QComboBox()
+            self.model_combo.setEditable(True)
+            form.addRow("Model:", self.model_combo)
+            self.key_edit = QtWidgets.QLineEdit()
+            self.key_edit.setEchoMode(QtWidgets.QLineEdit.Password)
+            form.addRow("API key:", self.key_edit)
+            self.key_link = QtWidgets.QLabel()
+            self.key_link.setOpenExternalLinks(True)
+            form.addRow("", self.key_link)
+            note = QtWidgets.QLabel("Keys are stored locally in your user settings (not encrypted).")
+            note.setObjectName("Muted")
+            note.setWordWrap(True)
+            form.addRow("", note)
+            bb = QtWidgets.QDialogButtonBox(
+                QtWidgets.QDialogButtonBox.Save | QtWidgets.QDialogButtonBox.Close)
+            bb.button(QtWidgets.QDialogButtonBox.Save).clicked.connect(self._save)
+            bb.rejected.connect(self.reject)
+            form.addRow(bb)
+
+            self.provider_combo.currentIndexChanged.connect(self._provider_changed)
+            pid = settings.value("ai/provider", "anthropic", type=str)
+            self.provider_combo.setCurrentIndex(max(0, self.provider_combo.findData(pid)))
+            self._provider_changed()
+
+        def _provider_changed(self):
+            pid = self.provider_combo.currentData()
+            prov = ai.PROVIDERS[pid]
+            self.model_combo.clear()
+            self.model_combo.addItems(prov.models)
+            self.model_combo.setCurrentText(
+                self.settings.value(f"ai/model/{pid}", prov.default_model, type=str))
+            self.key_edit.setText(self.settings.value(f"ai/key/{pid}", "", type=str))
+            self.key_link.setText(f"<a href='{prov.key_url}'>Get an API key</a>")
+
+        def _save(self):
+            pid = self.provider_combo.currentData()
+            self.settings.setValue("ai/provider", pid)
+            self.settings.setValue(f"ai/model/{pid}", self.model_combo.currentText().strip())
+            self.settings.setValue(f"ai/key/{pid}", self.key_edit.text().strip())
+            self.accept()
+
     class AiAssistantTab(QtWidgets.QWidget):
+        CHATS_FILE = "ai_chats.json"
+
         def __init__(self, main_window, parent=None):
             super().__init__(parent)
             self.main = main_window
             self.settings = QtCore.QSettings("DeltaModTech", "VCDS Toolkit")
+            self.chats: list = []
+            self.current = None
             self.history: list = []
             self._thread = None
             self._worker = None
             self._pending = None
             self._error = None
             self._stream_text = ""
-            self._active_vin = None
             self._build()
-            self._load_provider_settings()
+            self._load_chats()
+            self._update_model_label()
 
         def _build(self):
-            v = QtWidgets.QVBoxLayout(self)
+            root = QtWidgets.QHBoxLayout(self)
 
-            cfg = QtWidgets.QHBoxLayout()
-            cfg.addWidget(QtWidgets.QLabel("Provider:"))
-            self.provider_combo = QtWidgets.QComboBox()
-            for pid, prov in ai.PROVIDERS.items():
-                self.provider_combo.addItem(prov.label, pid)
-            cfg.addWidget(self.provider_combo)
-            cfg.addWidget(QtWidgets.QLabel("Model:"))
-            self.model_combo = QtWidgets.QComboBox()
-            self.model_combo.setEditable(True)
-            self.model_combo.setMinimumWidth(190)
-            cfg.addWidget(self.model_combo)
-            cfg.addWidget(QtWidgets.QLabel("API key:"))
-            self.key_edit = QtWidgets.QLineEdit()
-            self.key_edit.setEchoMode(QtWidgets.QLineEdit.Password)
-            self.key_edit.setMinimumWidth(220)
-            cfg.addWidget(self.key_edit, 1)
-            self.btn_save_key = QtWidgets.QPushButton("Save")
-            cfg.addWidget(self.btn_save_key)
-            self.key_link = QtWidgets.QLabel()
-            self.key_link.setOpenExternalLinks(True)
-            cfg.addWidget(self.key_link)
-            v.addLayout(cfg)
+            # left: conversation list
+            left = QtWidgets.QVBoxLayout()
+            self.btn_new = QtWidgets.QPushButton("＋  New chat")
+            self.btn_new.setObjectName("Accent")
+            left.addWidget(self.btn_new)
+            self.chat_list = QtWidgets.QListWidget()
+            left.addWidget(self.chat_list, 1)
+            self.btn_delete = QtWidgets.QPushButton("🗑  Delete")
+            left.addWidget(self.btn_delete)
+            left_w = QtWidgets.QWidget()
+            left_w.setLayout(left)
+            left_w.setFixedWidth(200)
+            root.addWidget(left_w)
 
-            opts = QtWidgets.QHBoxLayout()
-            self.chk_context = QtWidgets.QCheckBox("Include current scan/log data as context")
+            # right: header + conversation + input
+            right = QtWidgets.QVBoxLayout()
+            header = FlowLayout()
+            self.model_label = QtWidgets.QLabel("")
+            self.model_label.setObjectName("Muted")
+            self.btn_settings = QtWidgets.QPushButton("⚙ AI Settings")
+            self.chk_context = QtWidgets.QCheckBox("Use scan/log as context")
             self.chk_context.setChecked(True)
-            opts.addWidget(self.chk_context)
-            self.chk_tools = QtWidgets.QCheckBox("Let the AI browse stored logs")
+            self.chk_tools = QtWidgets.QCheckBox("Let the AI use tools")
             self.chk_tools.setChecked(True)
-            self.chk_tools.setToolTip("The assistant can list, read and diagnose logs in your "
-                                      "logs folder on its own")
-            opts.addWidget(self.chk_tools)
-            opts.addStretch(1)
-            self.veh_label = QtWidgets.QLabel("")
-            self.veh_label.setStyleSheet("color:#718096")
-            opts.addWidget(self.veh_label)
-            self.btn_save_chat = QtWidgets.QPushButton("Save chat…")
-            opts.addWidget(self.btn_save_chat)
-            self.btn_clear_chat = QtWidgets.QPushButton("Clear chat")
-            opts.addWidget(self.btn_clear_chat)
-            v.addLayout(opts)
+            self.chk_tools.setToolTip("Browse stored logs and read the live car to investigate")
+            self.btn_save_chat = QtWidgets.QPushButton("Export…")
+            for w in (self.model_label, self.btn_settings, self.chk_context, self.chk_tools,
+                      self.btn_save_chat):
+                header.addWidget(w)
+            right.addLayout(header)
 
             self.conversation = QtWidgets.QTextBrowser()
             self.conversation.setOpenExternalLinks(True)
-            v.addWidget(self.conversation, 1)
+            right.addWidget(self.conversation, 1)
 
             entry = QtWidgets.QHBoxLayout()
             self.input = ChatInput()
@@ -2805,83 +2852,128 @@ if _HAVE_QT:
             entry.addWidget(self.input, 1)
             self.btn_send = QtWidgets.QPushButton("Send")
             entry.addWidget(self.btn_send)
-            v.addLayout(entry)
+            right.addLayout(entry)
+            root.addLayout(right, 1)
 
-            self.provider_combo.currentIndexChanged.connect(self._provider_changed)
-            self.btn_save_key.clicked.connect(self._save_key)
-            self.btn_send.clicked.connect(self.send)
-            self.btn_clear_chat.clicked.connect(self._clear_chat)
+            self.btn_new.clicked.connect(self._new_chat)
+            self.btn_delete.clicked.connect(self._delete_chat)
+            self.chat_list.currentRowChanged.connect(self._select_chat)
+            self.btn_settings.clicked.connect(self.open_settings)
             self.btn_save_chat.clicked.connect(self._save_chat)
+            self.btn_send.clicked.connect(self.send)
             self.input.send_requested.connect(self.send)
 
-            self.refresh_vehicle()
-
         # -- settings ------------------------------------------------------- #
-        def _provider_changed(self):
-            pid = self.provider_combo.currentData()
-            prov = ai.PROVIDERS[pid]
-            self.model_combo.clear()
-            self.model_combo.addItems(prov.models)
-            saved_model = self.settings.value(f"ai/model/{pid}", prov.default_model, type=str)
-            self.model_combo.setCurrentText(saved_model)
-            self.key_edit.setText(self.settings.value(f"ai/key/{pid}", "", type=str))
-            self.key_link.setText(f"<a href='{prov.key_url}'>Get a key</a>")
-            self.settings.setValue("ai/provider", pid)
+        def open_settings(self):
+            if AiSettingsDialog(self.settings, self).exec():
+                self._update_model_label()
 
-        def _load_provider_settings(self):
+        def _update_model_label(self):
             pid = self.settings.value("ai/provider", "anthropic", type=str)
-            idx = self.provider_combo.findData(pid)
-            self.provider_combo.setCurrentIndex(max(0, idx))
-            self._provider_changed()
+            prov = ai.PROVIDERS.get(pid)
+            model = self.settings.value(
+                f"ai/model/{pid}", prov.default_model if prov else "", type=str)
+            has_key = bool(self.settings.value(f"ai/key/{pid}", "", type=str))
+            name = prov.label if prov else pid
+            tail = "" if has_key else "  —  no API key (open ⚙ AI Settings)"
+            self.model_label.setText(f"🤖 {name} · {model}{tail}")
 
-        def _save_key(self):
-            pid = self.provider_combo.currentData()
-            self.settings.setValue(f"ai/key/{pid}", self.key_edit.text().strip())
-            self.settings.setValue(f"ai/model/{pid}", self.model_combo.currentText().strip())
-            QtWidgets.QMessageBox.information(
-                self, "Saved",
-                "API key saved for this provider.\n\nNote: it is stored locally in your "
-                "user settings (not encrypted).",
-            )
+        def refresh_vehicle(self):
+            """Called when the tab is shown — just refresh the model header."""
+            self._update_model_label()
 
-        # -- per-vehicle memory --------------------------------------------- #
+        # -- chat store ----------------------------------------------------- #
+        def _chats_path(self):
+            return os.path.join(DEFAULT_LOGS_DIR, self.CHATS_FILE)
+
         def _garage_path(self):
             return os.path.join(DEFAULT_LOGS_DIR, "garage.json")
 
-        def refresh_vehicle(self):
-            """Load the active garage vehicle's saved chat (called when shown)."""
+        def _mk_id(self, n):
+            return time.strftime("%Y%m%d%H%M%S") + str(n)
+
+        def _blank_chat(self):
             vin = self.settings.value("garage/active_vin", "", type=str)
-            if vin == self._active_vin:
+            return {"id": self._mk_id(len(self.chats)), "title": "New chat",
+                    "ts": time.time(), "messages": [], "vin": vin or None}
+
+        def _migrate_garage_chats(self):
+            out = []
+            for v in garage_mod.load_garage(self._garage_path()):
+                if getattr(v, "chat", None):
+                    out.append({"id": self._mk_id(len(out)), "title": v.label,
+                                "ts": 0, "messages": list(v.chat), "vin": v.vin})
+            return out
+
+        def _load_chats(self):
+            import json
+            chats = []
+            try:
+                with open(self._chats_path(), encoding="utf-8") as fh:
+                    chats = json.load(fh)
+            except Exception:  # noqa: BLE001
+                chats = []
+            if not chats:
+                chats = self._migrate_garage_chats()
+            self.chats = chats if isinstance(chats, list) else []
+            if not self.chats:
+                self.chats = [self._blank_chat()]
+            self._refresh_chat_list()
+            self.chat_list.setCurrentRow(0)
+            if self.current is None:
+                self._select_chat(0)
+
+        def _save_chats(self):
+            import json
+            try:
+                os.makedirs(DEFAULT_LOGS_DIR, exist_ok=True)
+                with open(self._chats_path(), "w", encoding="utf-8") as fh:
+                    json.dump(self.chats, fh, indent=2)
+            except Exception:  # noqa: BLE001
+                pass
+
+        def _refresh_chat_list(self):
+            self.chat_list.blockSignals(True)
+            self.chat_list.clear()
+            for c in self.chats:
+                it = QtWidgets.QListWidgetItem(c.get("title") or "New chat")
+                if c.get("vin"):
+                    it.setToolTip(f"Vehicle: {c['vin']}")
+                self.chat_list.addItem(it)
+            self.chat_list.blockSignals(False)
+
+        def _refresh_titles(self):
+            for i, c in enumerate(self.chats):
+                it = self.chat_list.item(i)
+                if it:
+                    it.setText(c.get("title") or "New chat")
+
+        def _select_chat(self, row):
+            if row < 0 or row >= len(self.chats):
                 return
-            self._save_vehicle_chat()  # persist the outgoing vehicle first
-            self._active_vin = vin
-            if vin:
-                veh = garage_mod.find(garage_mod.load_garage(self._garage_path()), vin)
-                self.history = list(veh.chat) if veh else []
-                self.veh_label.setText(f"💬 {veh.label if veh else vin}")
-            else:
-                self.history = []
-                self.veh_label.setText("💬 shared chat (no active vehicle)")
+            self.current = self.chats[row]
+            self.history = self.current["messages"]
             self._stream_text = ""
             self._pending = None
             self._error = None
             self._render()
 
-        def _save_vehicle_chat(self):
-            if not self._active_vin:
-                return
-            vehicles = garage_mod.load_garage(self._garage_path())
-            if garage_mod.set_chat(vehicles, self._active_vin, self.history):
-                garage_mod.save_garage(self._garage_path(), vehicles)
+        def _new_chat(self):
+            self.chats.insert(0, self._blank_chat())
+            self._save_chats()
+            self._refresh_chat_list()
+            self.chat_list.setCurrentRow(0)
 
-        # -- chat ----------------------------------------------------------- #
-        def _clear_chat(self):
-            self.history = []
-            self._pending = None
-            self._error = None
-            self._stream_text = ""
-            self._save_vehicle_chat()
-            self._render()
+        def _delete_chat(self):
+            row = self.chat_list.currentRow()
+            if row < 0 or not self.chats:
+                return
+            del self.chats[row]
+            if not self.chats:
+                self.chats = [self._blank_chat()]
+            self._save_chats()
+            self._refresh_chat_list()
+            self.chat_list.setCurrentRow(0)
 
         def _save_chat(self):
             if not self.history:
@@ -2919,8 +3011,9 @@ if _HAVE_QT:
                     "<div style='color:#718096'>Ask the assistant to help diagnose your car. "
                     "It uses the scan/log open in the File Analyzer tab, can browse your stored "
                     "logs, and — when the car is connected in the Live tab — read live DTCs, a "
-                    "PID snapshot, VIN and readiness. Pick a provider, paste an API key, and "
-                    "Save.</div>")
+                    "PID snapshot, VIN and readiness.<br><br>Set your provider and API key in "
+                    "<b>⚙ AI Settings</b>, then type a message below. Use <b>＋ New chat</b> to "
+                    "start a fresh conversation.</div>")
                 return
             blocks = []
             for m in self.history:
@@ -2961,19 +3054,32 @@ if _HAVE_QT:
             text = self.input.toPlainText().strip()
             if not text:
                 return
-            pid = self.provider_combo.currentData()
-            key = self.key_edit.text().strip()
+            pid = self.settings.value("ai/provider", "anthropic", type=str)
+            key = self.settings.value(f"ai/key/{pid}", "", type=str)
             if not key:
-                QtWidgets.QMessageBox.warning(self, "No API key", "Enter and Save an API key first.")
+                r = QtWidgets.QMessageBox.question(
+                    self, "No API key",
+                    "No API key is set for this provider. Open AI Settings now?",
+                    QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No, QtWidgets.QMessageBox.Yes)
+                if r == QtWidgets.QMessageBox.Yes:
+                    self.open_settings()
                 return
-            model = self.model_combo.currentText().strip()
+            prov = ai.PROVIDERS.get(pid)
+            model = self.settings.value(
+                f"ai/model/{pid}", prov.default_model if prov else "", type=str)
+            if self.current is None:
+                self._new_chat()
             self.history.append({"role": "user", "content": text})
+            if self.current.get("title") in (None, "", "New chat"):
+                self.current["title"] = text[:40] + ("…" if len(text) > 40 else "")
+                self._refresh_titles()
             self.input.clear()
             self.btn_send.setEnabled(False)
             self._error = None
             self._stream_text = ""
             self._pending = "Assistant is typing…"
             self._render()
+            self._save_chats()
 
             prof = profiles.get_profile(
                 self.settings.value("ui/profile", profiles.DEFAULT_PROFILE, type=str))
@@ -3026,7 +3132,7 @@ if _HAVE_QT:
             self._stream_text = ""
             self._pending = None
             self.btn_send.setEnabled(True)
-            self._save_vehicle_chat()
+            self._save_chats()
             self._render()
 
         @QtCore.Slot(str)
@@ -3809,6 +3915,9 @@ if _HAVE_QT:
             resets_action = QtGui.QAction("&Resets / Service…", self)
             resets_action.triggered.connect(self.show_resets)
             tools_menu.addAction(resets_action)
+            ai_settings_action = QtGui.QAction("&AI Settings…", self)
+            ai_settings_action.triggered.connect(lambda: self.ai_tab.open_settings())
+            tools_menu.addAction(ai_settings_action)
             tools_menu.addSeparator()
             logs_action = QtGui.QAction("Open &logs folder", self)
             logs_action.triggered.connect(lambda: _open_folder(DEFAULT_LOGS_DIR))
