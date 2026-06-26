@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.21.1] - 2026-06-26
+
+### Added
+- The timing chain/belt stretch finding now appends a **brand-specific note** when
+  one applies — e.g. the **Ford 3.5 EcoBoost** cam-phaser / chain-stretch tell, and
+  the VAG tensioner note — so the finding speaks to the actual engine.
+
 ## [1.21.0] - 2026-06-26
 
 ### Changed
@@ -592,7 +599,8 @@ First public release.
   installer, and publishes a GitHub Release on each `v*` tag.
 - 54-test pytest suite (no hardware; the live path is mocked).
 
-[Unreleased]: https://github.com/JWalen/VAGScanner/compare/v1.21.0...HEAD
+[Unreleased]: https://github.com/JWalen/VAGScanner/compare/v1.21.1...HEAD
+[1.21.1]: https://github.com/JWalen/VAGScanner/releases/tag/v1.21.1
 [1.21.0]: https://github.com/JWalen/VAGScanner/releases/tag/v1.21.0
 [1.20.0]: https://github.com/JWalen/VAGScanner/releases/tag/v1.20.0
 [1.19.0]: https://github.com/JWalen/VAGScanner/releases/tag/v1.19.0

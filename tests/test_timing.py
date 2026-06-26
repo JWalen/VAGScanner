@@ -35,6 +35,16 @@ def test_timing_finding_when_code_is_in_status_detail():
     assert any(f.title == "Possible timing chain / belt stretch" for f in report.findings)
 
 
+def test_timing_finding_includes_brand_note():
+    # Ford 3.5 EcoBoost note is appended for the ford profile, not for generic
+    ford = diagnose(scan=_scan_with("P0017"), profile="ford")
+    f = next(f for f in ford.findings if f.title == "Possible timing chain / belt stretch")
+    assert "EcoBoost" in f.detail
+    gen = diagnose(scan=_scan_with("P0017"), profile="generic")
+    fg = next(f for f in gen.findings if f.title == "Possible timing chain / belt stretch")
+    assert "EcoBoost" not in fg.detail
+
+
 def test_no_timing_finding_without_correlation_code():
     report = diagnose(scan=_scan_with("P0420"), profile="generic")
     assert not any("timing chain" in f.title.lower() for f in report.findings)

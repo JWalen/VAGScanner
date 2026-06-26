@@ -116,9 +116,11 @@ def _fault_findings(scan: AutoScan, profile: Profile) -> List[Finding]:
 _TIMING_CODES = {"P0008", "P0009", "P0016", "P0017", "P0018", "P0019"}
 
 
-def _timing_findings(scan: Optional[AutoScan], log: Optional[MeasuringLog]) -> List[Finding]:
+def _timing_findings(scan: Optional[AutoScan], log: Optional[MeasuringLog],
+                     profile: Optional[Profile] = None) -> List[Finding]:
     """Dedicated timing chain/belt stretch check (correlation DTCs + cam deviation)."""
     out: List[Finding] = []
+    brand_note = (profile.known_issues.get("timing_chain", "") if profile else "")
 
     found = set()
     if scan is not None:
@@ -135,7 +137,7 @@ def _timing_findings(scan: Optional[AutoScan], log: Optional[MeasuringLog]) -> L
             "This is the classic signature of a stretched/worn timing chain (with worn guides or a "
             "weak tensioner) or a jumped/worn timing belt. A failed VVT actuator/phaser or a cam/"
             "crank sensor can mimic it — confirm by comparing actual-vs-specified camshaft timing "
-            "and inspecting the chain stretch/tensioner.",
+            "and inspecting the chain stretch/tensioner. " + brand_note,
             "fault",
             ["Stretched timing chain + worn guides/tensioner", "Jumped or worn timing belt",
              "Failed VVT actuator/phaser or solenoid", "Cam/crank position sensor or reluctor ring"],
@@ -373,7 +375,7 @@ def diagnose(scan: Optional[AutoScan] = None, log: Optional[MeasuringLog] = None
         findings.extend(_fault_findings(scan, prof))
     if log is not None:
         findings.extend(_data_findings(log, prof))
-    findings.extend(_timing_findings(scan, log))  # timing chain/belt stretch check
+    findings.extend(_timing_findings(scan, log, prof))  # timing chain/belt stretch check
 
     findings.sort(key=lambda f: (-f.severity_rank, f.category, f.title))
 

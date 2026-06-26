@@ -45,6 +45,10 @@ _FORD_ISSUES: Dict[str, str] = {
                          "cylinder — investigate coolant loss combined with misfires.",
     "throttle_body": "Ford electronic throttle bodies can trip limp mode "
                      "(e.g. P2111) — cleaning or replacement is often required.",
+    "timing_chain": "The 3.5 EcoBoost (and other Ford engines) can stretch a timing chain or wear "
+                    "a cam phaser at higher mileage — a cold-start rattle and cam/crank correlation "
+                    "codes (P0016–P0019) are the tell. Confirm actual-vs-specified cam timing "
+                    "(FORScan) and inspect the chain/tensioner.",
 }
 
 
