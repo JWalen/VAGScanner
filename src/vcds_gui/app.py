@@ -202,6 +202,66 @@ if _HAVE_QT:
         app.setPalette(p)
         app.setStyleSheet(_CARBON_QSS.format(**CARBON))
 
+    class FlowLayout(QtWidgets.QLayout):
+        """A layout that lays widgets out left-to-right and wraps to the next row
+        when the window is too narrow — so button bars fit any window size."""
+
+        def __init__(self, parent=None, spacing=6):
+            super().__init__(parent)
+            self._items = []
+            self.setSpacing(spacing)
+            self.setContentsMargins(0, 0, 0, 0)
+
+        def addItem(self, item):
+            self._items.append(item)
+
+        def count(self):
+            return len(self._items)
+
+        def itemAt(self, i):
+            return self._items[i] if 0 <= i < len(self._items) else None
+
+        def takeAt(self, i):
+            return self._items.pop(i) if 0 <= i < len(self._items) else None
+
+        def expandingDirections(self):
+            return QtCore.Qt.Orientation(0)
+
+        def hasHeightForWidth(self):
+            return True
+
+        def heightForWidth(self, width):
+            return self._do(QtCore.QRect(0, 0, width, 0), test=True)
+
+        def setGeometry(self, rect):
+            super().setGeometry(rect)
+            self._do(rect, test=False)
+
+        def sizeHint(self):
+            return self.minimumSize()
+
+        def minimumSize(self):
+            size = QtCore.QSize()
+            for it in self._items:
+                size = size.expandedTo(it.minimumSize())
+            return size
+
+        def _do(self, rect, test):
+            x, y, line_h = rect.x(), rect.y(), 0
+            sp = self.spacing()
+            for it in self._items:
+                w = it.sizeHint().width()
+                h = it.sizeHint().height()
+                if x + w > rect.right() and line_h > 0:
+                    x = rect.x()
+                    y += line_h + sp
+                    line_h = 0
+                if not test:
+                    it.setGeometry(QtCore.QRect(QtCore.QPoint(x, y), it.sizeHint()))
+                x += w + sp
+                line_h = max(line_h, h)
+            return y + line_h - rect.y()
+
     # --------------------------------------------------------------------- #
     # Shared plotting widget
     # --------------------------------------------------------------------- #
@@ -426,8 +486,8 @@ if _HAVE_QT:
         def _build(self):
             outer = QtWidgets.QVBoxLayout(self)
 
-            # toolbar
-            bar = QtWidgets.QHBoxLayout()
+            # toolbar (wraps on narrow windows)
+            bar = FlowLayout()
             self.btn_open = QtWidgets.QPushButton("Open Measuring CSV…")
             self.btn_scan = QtWidgets.QPushButton("Open Auto-Scan…")
             self.chk_norm = QtWidgets.QCheckBox("Normalize")
@@ -451,7 +511,7 @@ if _HAVE_QT:
                       self.btn_compare, self.chk_norm, self.chk_measure, self.btn_fit,
                       self.btn_export, self.view_combo):
                 bar.addWidget(w)
-            bar.addWidget(self.lbl_info, 1)
+            bar.addWidget(self.lbl_info)
             outer.addLayout(bar)
 
             split = QtWidgets.QSplitter(QtCore.Qt.Horizontal)
@@ -970,7 +1030,7 @@ if _HAVE_QT:
 
             # connection bar
             conn_box = QtWidgets.QGroupBox("Adapter")
-            cb = QtWidgets.QHBoxLayout(conn_box)
+            cb = FlowLayout(conn_box)
             self.port_combo = QtWidgets.QComboBox()
             self.port_combo.setEditable(True)
             self.port_combo.setMinimumWidth(200)
@@ -993,7 +1053,7 @@ if _HAVE_QT:
                       QtWidgets.QLabel("Baud:"), self.baud_combo, self.chk_async,
                       self.btn_connect, self.btn_disconnect):
                 cb.addWidget(w)
-            cb.addWidget(self.conn_status, 1)
+            cb.addWidget(self.conn_status)
             outer.addWidget(conn_box)
 
             # Live alert HUD — flashes red when a threshold rule is breached.
@@ -1086,7 +1146,7 @@ if _HAVE_QT:
             self.dtc_tree.setHeaderLabels(["Stored DTC / likely cause", "Severity"])
             self.dtc_tree.setColumnWidth(0, 250)
             dv.addWidget(self.dtc_tree)
-            dbar = QtWidgets.QHBoxLayout()
+            dbar = FlowLayout()
             self.btn_read_dtc = QtWidgets.QPushButton("Read DTCs")
             self.btn_clear_dtc = QtWidgets.QPushButton("Clear DTCs…")
             self.btn_vehinfo = QtWidgets.QPushButton("ⓘ Vehicle Info")
@@ -1114,7 +1174,7 @@ if _HAVE_QT:
             split.setSizes([400, 720])
 
             # logging controls
-            run_bar = QtWidgets.QHBoxLayout()
+            run_bar = FlowLayout()
             run_bar.addWidget(QtWidgets.QLabel("Duration (s):"))
             self.dur_spin = QtWidgets.QSpinBox()
             self.dur_spin.setRange(1, live.MAX_SESSION_SECONDS)
@@ -1146,7 +1206,7 @@ if _HAVE_QT:
             run_bar.addWidget(self.btn_start)
             run_bar.addWidget(self.btn_stop)
             self.run_status = QtWidgets.QLabel("")
-            run_bar.addWidget(self.run_status, 1)
+            run_bar.addWidget(self.run_status)
             outer.addLayout(run_bar)
 
             # signals
@@ -3538,6 +3598,7 @@ if _HAVE_QT:
             if icon:
                 self.setWindowIcon(QtGui.QIcon(icon))
             self.resize(1280, 800)
+            self.setMinimumSize(760, 520)  # usable on small/laptop screens
             self._update_info = None
 
             central = QtWidgets.QWidget()

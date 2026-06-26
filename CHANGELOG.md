@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.15.0] - 2026-06-26
+
+### Changed
+- **Responsive UI.** Button toolbars now **wrap to fit any window width** (a new
+  flow layout) instead of being clipped, and the window can shrink to a small
+  minimum — usable on small/laptop screens and odd window sizes.
+
 ## [1.14.0] - 2026-06-26
 
 ### Added
@@ -520,7 +527,8 @@ First public release.
   installer, and publishes a GitHub Release on each `v*` tag.
 - 54-test pytest suite (no hardware; the live path is mocked).
 
-[Unreleased]: https://github.com/JWalen/VAGScanner/compare/v1.14.0...HEAD
+[Unreleased]: https://github.com/JWalen/VAGScanner/compare/v1.15.0...HEAD
+[1.15.0]: https://github.com/JWalen/VAGScanner/releases/tag/v1.15.0
 [1.14.0]: https://github.com/JWalen/VAGScanner/releases/tag/v1.14.0
 [1.13.0]: https://github.com/JWalen/VAGScanner/releases/tag/v1.13.0
 [1.12.0]: https://github.com/JWalen/VAGScanner/releases/tag/v1.12.0
