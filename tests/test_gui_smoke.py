@@ -174,6 +174,10 @@ def test_live_data_window(qapp):
     assert win.table.item(r, 4).text() == "1500"   # max
     win.update_values({name: 1200.0})
     assert win.table.item(r, 5).text() == "▼"       # trend down
+    assert win.rate_combo.count() == 5              # refresh-rate selector
+    assert "updates/s" in win.status.text()         # measured rate shown
+    win.rate_combo.setCurrentIndex(2)               # 5 Hz
+    assert win._interval_ms == 200
     win.close()
 
 

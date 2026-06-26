@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.12.0] - 2026-06-26
+
+### Changed
+- **Smoother Live Data.** Removed the artificial poll delay (it now streams as
+  fast as the adapter allows), added a **Refresh-rate selector** (as-fast-as-
+  possible / 10 / 5 / 2 / 1 Hz), and the window now shows the **actual measured
+  update rate** and PID count. Fewer selected PIDs = a faster refresh, since an
+  ELM327 reads one PID per request.
+
 ## [1.11.0] - 2026-06-26
 
 ### Added
@@ -494,7 +503,8 @@ First public release.
   installer, and publishes a GitHub Release on each `v*` tag.
 - 54-test pytest suite (no hardware; the live path is mocked).
 
-[Unreleased]: https://github.com/JWalen/VAGScanner/compare/v1.11.0...HEAD
+[Unreleased]: https://github.com/JWalen/VAGScanner/compare/v1.12.0...HEAD
+[1.12.0]: https://github.com/JWalen/VAGScanner/releases/tag/v1.12.0
 [1.11.0]: https://github.com/JWalen/VAGScanner/releases/tag/v1.11.0
 [1.10.1]: https://github.com/JWalen/VAGScanner/releases/tag/v1.10.1
 [1.10.0]: https://github.com/JWalen/VAGScanner/releases/tag/v1.10.0

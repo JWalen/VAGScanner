@@ -754,11 +754,11 @@ if _HAVE_QT:
         values = QtCore.Signal(dict)
         failed = QtCore.Signal(str)
 
-        def __init__(self, conn, channels, interval_ms=600):
+        def __init__(self, conn, channels, interval_ms=0):
             super().__init__()
             self.conn = conn
             self.channels = channels
-            self.interval_ms = interval_ms
+            self.interval_ms = interval_ms  # 0 = as fast as the adapter allows
             self._stop = False
 
         def stop(self):
@@ -775,7 +775,8 @@ if _HAVE_QT:
                 if self._stop:
                     return
                 self.values.emit(dict(snap))
-                QtCore.QThread.msleep(int(self.interval_ms))
+                if self.interval_ms:
+                    QtCore.QThread.msleep(int(self.interval_ms))
 
     class LiveDataWindow(QtWidgets.QWidget):
         """Always-on Live Data table: current value, unit, min/max and trend per PID."""
@@ -791,6 +792,10 @@ if _HAVE_QT:
             self._stats = {}     # name -> [min, max, last]
             self._thread = None
             self._poller = None
+            self._poll_conn = None
+            self._interval_ms = 0
+            self._rate_ema = None
+            self._last_mono = None
 
             v = QtWidgets.QVBoxLayout(self)
             self.status = QtWidgets.QLabel("Streaming…")
@@ -809,11 +814,24 @@ if _HAVE_QT:
             self.table.resizeColumnsToContents()
             v.addWidget(self.table, 1)
             row = QtWidgets.QHBoxLayout()
+            row.addWidget(QtWidgets.QLabel("Refresh:"))
+            self.rate_combo = QtWidgets.QComboBox()
+            self._rate_options = [("As fast as possible", 0), ("10 Hz", 100), ("5 Hz", 200),
+                                  ("2 Hz", 500), ("1 Hz", 1000)]
+            for label, _ms in self._rate_options:
+                self.rate_combo.addItem(label)
+            self.rate_combo.currentIndexChanged.connect(self._rate_changed)
+            row.addWidget(self.rate_combo)
+            row.addStretch(1)
             btn_reset = QtWidgets.QPushButton("Reset min/max")
             btn_reset.clicked.connect(self._reset_stats)
-            row.addStretch(1)
             row.addWidget(btn_reset)
             v.addLayout(row)
+
+        def _rate_changed(self, idx):
+            self._interval_ms = self._rate_options[idx][1]
+            if self._poller is not None and self._poll_conn is not None:
+                self.start_poll(self._poll_conn)  # restart at the new interval
 
         def _reset_stats(self):
             self._stats.clear()
@@ -823,6 +841,17 @@ if _HAVE_QT:
 
         @QtCore.Slot(dict)
         def update_values(self, values):
+            now = time.perf_counter()
+            if self._last_mono is not None:
+                dt = now - self._last_mono
+                if dt > 0:
+                    inst = 1.0 / dt
+                    self._rate_ema = inst if self._rate_ema is None \
+                        else 0.7 * self._rate_ema + 0.3 * inst
+                    self.status.setText(
+                        f"Streaming live · ~{self._rate_ema:.1f} updates/s · "
+                        f"{len(self._channels)} PIDs")
+            self._last_mono = now
             for name, val in values.items():
                 r = self._rows.get(name)
                 if r is None or val is None:
@@ -842,8 +871,9 @@ if _HAVE_QT:
 
         def start_poll(self, conn):
             self.stop_poll()
+            self._poll_conn = conn
             self._thread = QtCore.QThread()
-            self._poller = LiveDataPoller(conn, self._channels)
+            self._poller = LiveDataPoller(conn, self._channels, self._interval_ms)
             self._poller.moveToThread(self._thread)
             self._thread.started.connect(self._poller.run)
             self._poller.values.connect(self.update_values)
