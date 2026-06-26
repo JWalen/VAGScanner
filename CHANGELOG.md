@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.16.0] - 2026-06-26
+
+### Added
+- **Auto-identify on connect.** Every time you connect an adapter, the app now
+  reads the car's **VIN, calibration / ECU IDs, fuel type, protocol** and PID
+  count in the background. From the VIN it decodes **make / model-year** and:
+  - **creates the vehicle in your Garage the first time it's seen** (and just
+    re-activates it on later connects), so its logs always save under that
+    profile's folder;
+  - selects the matching **brand profile**;
+  - **embeds the vehicle ID at the top of every saved log** (as `#` comment
+    lines the parser ignores), so a log always says which car it came from.
+
 ## [1.15.0] - 2026-06-26
 
 ### Changed
@@ -527,7 +540,8 @@ First public release.
   installer, and publishes a GitHub Release on each `v*` tag.
 - 54-test pytest suite (no hardware; the live path is mocked).
 
-[Unreleased]: https://github.com/JWalen/VAGScanner/compare/v1.15.0...HEAD
+[Unreleased]: https://github.com/JWalen/VAGScanner/compare/v1.16.0...HEAD
+[1.16.0]: https://github.com/JWalen/VAGScanner/releases/tag/v1.16.0
 [1.15.0]: https://github.com/JWalen/VAGScanner/releases/tag/v1.15.0
 [1.14.0]: https://github.com/JWalen/VAGScanner/releases/tag/v1.14.0
 [1.13.0]: https://github.com/JWalen/VAGScanner/releases/tag/v1.13.0

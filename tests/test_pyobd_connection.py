@@ -28,6 +28,7 @@ class _Commands:
     GET_CURRENT_DTC = _Cmd("GET_CURRENT_DTC")
     CLEAR_DTC = _Cmd("CLEAR_DTC")
     RPM = _Cmd("RPM")
+    VIN = _Cmd("VIN")
 
 
 class _FakeObd:
@@ -58,6 +59,8 @@ class _FakeConn:
             return _Resp("OK")
         if cmd.name == "RPM":
             return _Resp(1500.0)
+        if cmd.name == "VIN":
+            return _Resp("WAUZZZ8K9BA123456")
         return _Resp(None, null=True)
 
     def status(self):
@@ -98,6 +101,13 @@ def test_rewatch_async_replaces_watchlist():
     c.rewatch(["RPM"])
     assert fake.watched == ["RPM"]
     assert fake.started >= 1 and fake.stopped >= 1 and fake.unwatched >= 1
+
+
+def test_identify_gathers_vehicle_info():
+    info = _conn().identify()
+    assert info["vin"] == "WAUZZZ8K9BA123456"
+    assert info["supported_count"] == 1          # only RPM in the fake
+    assert set(info) >= {"vin", "calibration_ids", "protocol", "supported_count"}
 
 
 def test_rewatch_blocking_is_noop():

@@ -105,6 +105,21 @@ def test_session_roundtrips_through_core(tmp_path):
     assert boost.min is not None and boost.min <= 1.0
 
 
+def test_vehicle_header_embedded_and_ignored_by_parser(tmp_path):
+    conn = FakeOBD()
+    logger = _logger(conn, tmp_path)
+    logger.header_lines = ["VIN: WAUZZZ8K9BA123456", "Vehicle: 2011 Audi", "Protocol: CAN"]
+    result = logger.run(duration_s=4.0, session_name="sess")
+
+    text = open(result.session_file, encoding="utf-8").read()
+    assert text.startswith("# VIN: WAUZZZ8K9BA123456")     # embedded at the top
+    assert "# Vehicle: 2011 Audi" in text
+    # ...and the parser ignores the comment block (blank-line separated)
+    mlog = parse.parse_measuring_log(result.session_file)
+    assert "Engine RPM" in {c.name for c in mlog.channels}
+    assert mlog.sample_count > 5
+
+
 def test_threshold_trigger_writes_capture(tmp_path):
     conn = FakeOBD()
     logger = _logger(conn, tmp_path, buffer_before_s=2.0, buffer_after_s=2.0)

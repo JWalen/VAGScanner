@@ -160,6 +160,23 @@ def test_live_alert_hud(qapp):
     win.close()
 
 
+def test_connect_identify_creates_garage_vehicle(qapp, tmp_path, monkeypatch):
+    from vcds_core import garage
+    monkeypatch.setattr(gui_app, "DEFAULT_LOGS_DIR", str(tmp_path))
+    win = gui_app.MainWindow()
+    lt = win.live_tab
+    lt.conn_status.setText("Connected — CAN (5 PIDs) · identifying vehicle…")
+    lt._on_identified({"vin": "WAUZZZ8K9BA123456", "calibration_ids": ["CAL1"],
+                       "protocol": "CAN", "ecu_name": "ECM", "fuel_type": "Gasoline",
+                       "supported_count": 5})
+    veh = garage.find(garage.load_garage(str(tmp_path / "garage.json")), "WAUZZZ8K9BA123456")
+    assert veh is not None and veh.make == "Audi" and veh.calibration_ids == ["CAL1"]
+    assert win.settings.value("garage/active_vin", "", type=str) == "WAUZZZ8K9BA123456"
+    assert any("VIN: WAUZZZ8K9BA123456" in h for h in lt.vehicle_header)
+    win.settings.setValue("garage/active_vin", "")
+    win.close()
+
+
 def test_live_data_window(qapp):
     from vcds_obd import live
     chans = live.build_channels({"RPM", "COOLANT_TEMP"})

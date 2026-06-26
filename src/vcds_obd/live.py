@@ -264,6 +264,7 @@ def write_measuring_csv(
     path: str,
     channels: Sequence[LiveChannel],
     rows: Sequence[Tuple[str, float, Dict[str, Optional[float]]]],
+    header_lines: Optional[Sequence[str]] = None,
 ) -> None:
     """Write rows in the flat measuring-log layout vcds_core parses.
 
@@ -271,10 +272,17 @@ def write_measuring_csv(
         path: Output CSV path.
         channels: Ordered channels (defines the column order).
         rows: Each row is ``(marker, time_seconds, {channel_name: value})``.
+        header_lines: Optional vehicle-info lines written as ``#`` comments at the
+            top, followed by a blank line. The parser ignores everything above
+            that blank separator, so this is safe metadata embedded in the log.
     """
     names = ["Marker", "TIME"] + [c.name for c in channels]
     units = ["", "s"] + [c.unit for c in channels]
     with open(path, "w", encoding="utf-8", newline="") as fh:
+        if header_lines:
+            for line in header_lines:
+                fh.write(f"# {line}\n")
+            fh.write("\n")  # blank line separates comments from the header rows
         w = csv.writer(fh)
         w.writerow(names)
         w.writerow(units)
@@ -340,6 +348,8 @@ class LiveLogger:
         self.clock = clock or time.monotonic
         self.sleep = sleep or time.sleep
         self.dtc_poll_s = dtc_poll_s
+        # Optional vehicle-identification lines embedded at the top of saved logs.
+        self.header_lines: List[str] = []
         self._stop = threading.Event()
 
     def stop(self) -> None:
@@ -447,7 +457,7 @@ class LiveLogger:
             if cap_rows is not None:
                 cap_rows.append(row)
                 if t >= cap_end:
-                    write_measuring_csv(cap_info.file, self.channels, cap_rows)  # type: ignore[arg-type]
+                    write_measuring_csv(cap_info.file, self.channels, cap_rows, self.header_lines)  # type: ignore[arg-type]
                     captures.append(cap_info)  # type: ignore[arg-type]
                     cap_rows = None
                     cap_info = None
@@ -457,10 +467,10 @@ class LiveLogger:
 
         # finalize an in-progress capture (session ended before buffer_after elapsed)
         if cap_rows is not None and cap_info is not None:
-            write_measuring_csv(cap_info.file, self.channels, cap_rows)
+            write_measuring_csv(cap_info.file, self.channels, cap_rows, self.header_lines)
             captures.append(cap_info)
 
-        write_measuring_csv(session_path, self.channels, all_rows)
+        write_measuring_csv(session_path, self.channels, all_rows, self.header_lines)
         final_dtcs = self._safe_dtcs()
         duration = all_rows[-1][1] if all_rows else 0.0
         return SessionResult(
@@ -695,6 +705,37 @@ class PyOBDConnection:
             return False
         resp = self._one_shot(cmd)
         return resp is not None
+
+    def identify(self) -> dict:
+        """Everything we can learn about the car on connect: VIN, calibration/ECU
+        IDs, fuel type, protocol and how many PIDs it serves."""
+        info: dict = {"vin": None, "calibration_ids": [], "ecu_name": None,
+                      "fuel_type": None, "protocol": None, "supported_count": 0}
+        try:
+            info["vin"] = self.read_vin()
+        except Exception:  # noqa: BLE001
+            pass
+        try:
+            info["calibration_ids"] = self.read_calibration_ids() or []
+        except Exception:  # noqa: BLE001
+            pass
+        for key, cmd_name in (("ecu_name", "ECU_NAME"), ("fuel_type", "FUEL_TYPE")):
+            try:
+                cmd = getattr(self._obd.commands, cmd_name, None)
+                resp = self._one_shot(cmd)
+                if resp and not resp.is_null() and resp.value:
+                    info[key] = str(resp.value).strip()
+            except Exception:  # noqa: BLE001
+                pass
+        try:
+            info["protocol"] = self.protocol()
+        except Exception:  # noqa: BLE001
+            pass
+        try:
+            info["supported_count"] = len(self.supported())
+        except Exception:  # noqa: BLE001
+            pass
+        return info
 
     # -- vehicle info / emissions reads --------------------------------------- #
     def read_vin(self) -> Optional[str]:

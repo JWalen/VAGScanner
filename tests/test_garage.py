@@ -85,6 +85,14 @@ def test_log_folder_name():
     assert garage.log_folder_name(bare)  # never empty
 
 
+def test_identify_fields_merge():
+    vehicles = [garage.Vehicle(vin="V1")]
+    garage.add_or_update(vehicles, garage.Vehicle(
+        vin="V1", calibration_ids=["CAL1"], ecu_name="ECM-1", fuel_type="Gasoline"))
+    v = vehicles[0]
+    assert v.calibration_ids == ["CAL1"] and v.ecu_name == "ECM-1" and v.fuel_type == "Gasoline"
+
+
 def test_chat_preserved_on_merge():
     vehicles = [garage.Vehicle(vin="V1", chat=[{"role": "user", "content": "keep"}])]
     garage.add_or_update(vehicles, garage.Vehicle(vin="V1", make="Audi"))

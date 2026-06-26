@@ -26,6 +26,9 @@ class Vehicle:
     odometer: Optional[float] = None
     maintenance: List[dict] = field(default_factory=list)  # service records
     fuel: List[dict] = field(default_factory=list)         # fill-up log
+    calibration_ids: List[str] = field(default_factory=list)
+    ecu_name: Optional[str] = None
+    fuel_type: Optional[str] = None
 
     @property
     def label(self) -> str:
@@ -69,6 +72,10 @@ def add_or_update(vehicles: List[Vehicle], vehicle: Vehicle) -> Vehicle:
     # fill in any newly-known fields without clobbering user edits
     existing.make = existing.make or vehicle.make
     existing.year = existing.year or vehicle.year
+    existing.ecu_name = existing.ecu_name or vehicle.ecu_name
+    existing.fuel_type = existing.fuel_type or vehicle.fuel_type
+    if vehicle.calibration_ids and not existing.calibration_ids:
+        existing.calibration_ids = list(vehicle.calibration_ids)
     if vehicle.brand_profile and vehicle.brand_profile != "generic":
         existing.brand_profile = vehicle.brand_profile
     return existing

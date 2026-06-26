@@ -860,6 +860,23 @@ if _HAVE_QT:
             except Exception as exc:  # noqa: BLE001
                 self.failed.emit(str(exc))
 
+    class IdentifyWorker(QtCore.QObject):
+        """Reads vehicle identification (VIN, cal-IDs, protocol…) off the thread."""
+
+        done = QtCore.Signal(dict)
+
+        def __init__(self, conn):
+            super().__init__()
+            self.conn = conn
+
+        @QtCore.Slot()
+        def run(self):
+            try:
+                info = self.conn.identify() if hasattr(self.conn, "identify") else {}
+            except Exception as exc:  # noqa: BLE001
+                info = {"error": str(exc)}
+            self.done.emit(info or {})
+
     class LiveDataPoller(QtCore.QObject):
         """Free-running poller: snapshots the adapter on an interval (own thread)."""
 
@@ -1020,6 +1037,7 @@ if _HAVE_QT:
             self.trigger_rules: List[dict] = []
             self._gauges = None
             self._livedata = None
+            self.vehicle_header: List[str] = []
             self.settings = QtCore.QSettings("DeltaModTech", "VCDS Toolkit")
             self._presets: dict = {}
             self._build()
@@ -1288,9 +1306,70 @@ if _HAVE_QT:
             mode = " · ⚡ smooth" if getattr(self.conn, "is_async", False) else ""
             self.conn_status.setText(
                 f"<span style='color:#38A169'>Connected</span> — {self.conn.protocol()} "
-                f"({len(supported)} PIDs){mode}"
+                f"({len(supported)} PIDs){mode} · identifying vehicle…"
             )
             self._set_connected(True)
+            self._start_identify()
+
+        def _start_identify(self):
+            if self.conn is None or not hasattr(self.conn, "identify"):
+                return
+            self._id_thread = QtCore.QThread()
+            self._id_worker = IdentifyWorker(self.conn)
+            self._id_worker.moveToThread(self._id_thread)
+            self._id_thread.started.connect(self._id_worker.run)
+            self._id_worker.done.connect(self._on_identified)
+            self._id_worker.done.connect(self._id_thread.quit)
+            self._id_thread.start()
+
+        @QtCore.Slot(dict)
+        def _on_identified(self, info):
+            from vcds_core import vin as vinmod
+
+            vin = info.get("vin")
+            dec = vinmod.decode_vin(vin) if vin else None
+
+            # Build the vehicle-info header embedded at the top of saved logs.
+            lines = []
+            if vin:
+                lines.append(f"VIN: {vin}")
+            if dec and dec.make:
+                lines.append(f"Vehicle: {dec.year or ''} {dec.make}".strip())
+            if info.get("ecu_name"):
+                lines.append(f"ECU: {info['ecu_name']}")
+            if info.get("fuel_type"):
+                lines.append(f"Fuel type: {info['fuel_type']}")
+            if info.get("calibration_ids"):
+                lines.append("Calibration IDs: " + ", ".join(info["calibration_ids"]))
+            if info.get("protocol"):
+                lines.append(f"Protocol: {info['protocol']}")
+            lines.append(f"Logged by OBD Toolkit {getattr(self.main, '_version', '')}".strip())
+            self.vehicle_header = lines
+
+            created = False
+            if vin:
+                path = os.path.join(DEFAULT_LOGS_DIR, "garage.json")
+                vehicles = garage_mod.load_garage(path)
+                created = garage_mod.find(vehicles, vin) is None
+                garage_mod.add_or_update(vehicles, garage_mod.Vehicle(
+                    vin=vin, make=(dec.make if dec else None),
+                    year=(dec.year if dec else None),
+                    brand_profile=(dec.brand_profile if dec else "generic"),
+                    calibration_ids=info.get("calibration_ids") or [],
+                    ecu_name=info.get("ecu_name"), fuel_type=info.get("fuel_type")))
+                garage_mod.save_garage(path, vehicles)
+                self.main.settings.setValue("garage/active_vin", vin)
+                if dec and dec.brand_profile != "generic":
+                    self.main._set_profile(dec.brand_profile)
+
+            label = f"{dec.year} {dec.make}" if (dec and dec.make) else (f"VIN {vin}" if vin else "")
+            base = self.conn_status.text().split(" · identifying")[0]
+            if label:
+                base += f" · <b>{label}</b>"
+                if created:
+                    self.run_status.setText(
+                        f"🚗 Added {label} to your Garage — logs save under it automatically.")
+            self.conn_status.setText(base)
 
         # -- PID picker helpers -------------------------------------------- #
         def _filter_pids(self, text: str):
@@ -1533,6 +1612,7 @@ if _HAVE_QT:
                 self.plot.add_channel(ch.name, [], [], ch.unit)
             logs_dir = self._session_dir()
             self.logger = live.LiveLogger(self.conn, channels, logs_dir, sample_rate_hz=self.rate_spin.value())
+            self.logger.header_lines = list(self.vehicle_header)  # embed vehicle ID in the log
 
             session_name = _safe_session_name(self.name_edit.text())
             self.thread = QtCore.QThread()
