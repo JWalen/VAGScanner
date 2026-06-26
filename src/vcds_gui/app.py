@@ -39,7 +39,7 @@ from vcds_gui import ai, updater
 from vcds_obd import live
 
 try:
-    from PySide6 import QtCore, QtGui, QtWidgets
+    from PySide6 import QtCore, QtGui, QtSvg, QtWidgets
     import pyqtgraph as pg
 
     _HAVE_QT = True
@@ -201,6 +201,46 @@ if _HAVE_QT:
             p.setColor(QtGui.QPalette.Disabled, role, c("#5A616B"))
         app.setPalette(p)
         app.setStyleSheet(_CARBON_QSS.format(**CARBON))
+
+    # Clean stroke icons (lucide.dev paths, ISC-licensed), tinted at runtime so
+    # they match the theme — replaces inconsistent emoji glyphs.
+    _ICON_SVGS = {
+        "dashboard": '<rect width="7" height="9" x="3" y="3" rx="1"/>'
+                     '<rect width="7" height="5" x="14" y="3" rx="1"/>'
+                     '<rect width="7" height="9" x="14" y="12" rx="1"/>'
+                     '<rect width="7" height="5" x="3" y="16" rx="1"/>',
+        "files": '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>'
+                 '<path d="M14 2v6h6"/><path d="m8 18 2-2 2 2 3-3"/>',
+        "live": '<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>',
+        "ai": '<path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/>'
+              '<path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/>',
+        "garage": '<path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 '
+                  '10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 '
+                  '3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/>'
+                  '<path d="M9 17h6"/><circle cx="17" cy="17" r="2"/>',
+        "settings": '<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 '
+                    '1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 '
+                    '1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 '
+                    '2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 '
+                    '2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 '
+                    '2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 '
+                    '2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15'
+                    '.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>'
+                    '<circle cx="12" cy="12" r="3"/>',
+    }
+
+    def _svg_icon(key: str, color: str, size: int = 18) -> "QtGui.QIcon":
+        body = _ICON_SVGS.get(key, "")
+        svg = (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" '
+               f'stroke="{color}" stroke-width="2" stroke-linecap="round" '
+               f'stroke-linejoin="round">{body}</svg>')
+        renderer = QtSvg.QSvgRenderer(QtCore.QByteArray(svg.encode("utf-8")))
+        pm = QtGui.QPixmap(size, size)
+        pm.fill(QtCore.Qt.transparent)
+        p = QtGui.QPainter(pm)
+        renderer.render(p)
+        p.end()
+        return QtGui.QIcon(pm)
 
     class FlowLayout(QtWidgets.QLayout):
         """A layout that lays widgets out left-to-right and wraps to the next row
@@ -2734,6 +2774,75 @@ if _HAVE_QT:
             except Exception as exc:  # noqa: BLE001
                 self.failed.emit(str(exc))
 
+    class SettingsDialog(QtWidgets.QDialog):
+        """One place for theme, units, default profile, updates, AI and logs."""
+
+        def __init__(self, main_window, parent=None):
+            super().__init__(parent or main_window)
+            self.main = main_window
+            self.settings = main_window.settings
+            self.setWindowTitle("Settings")
+            self.resize(540, 360)
+            form = QtWidgets.QFormLayout(self)
+
+            self.chk_dark = QtWidgets.QCheckBox("Carbon (dark) theme")
+            self.chk_dark.setChecked(self.settings.value("ui/dark", True, type=bool))
+            form.addRow("Appearance:", self.chk_dark)
+
+            self.units_combo = QtWidgets.QComboBox()
+            for uid, label in ((units.AS_LOGGED, "As logged"), (units.METRIC, "Metric"),
+                               (units.IMPERIAL, "Imperial")):
+                self.units_combo.addItem(label, uid)
+            self.units_combo.setCurrentIndex(max(0, self.units_combo.findData(
+                self.settings.value("ui/units", units.AS_LOGGED, type=str))))
+            form.addRow("Units:", self.units_combo)
+
+            self.prof_combo = QtWidgets.QComboBox()
+            for pid, prof in profiles.PROFILES.items():
+                self.prof_combo.addItem(prof.label, pid)
+            self.prof_combo.setCurrentIndex(max(0, self.prof_combo.findData(
+                self.settings.value("ui/profile", profiles.DEFAULT_PROFILE, type=str))))
+            form.addRow("Default vehicle profile:", self.prof_combo)
+
+            self.chk_update = QtWidgets.QCheckBox("Check for updates at startup")
+            self.chk_update.setChecked(self.settings.value("ui/check_updates", True, type=bool))
+            form.addRow("Updates:", self.chk_update)
+
+            ai_btn = QtWidgets.QPushButton("AI provider & API key…")
+            ai_btn.clicked.connect(lambda: AiSettingsDialog(self.settings, self).exec())
+            form.addRow("AI assistant:", ai_btn)
+
+            logs_row = QtWidgets.QHBoxLayout()
+            lbl = QtWidgets.QLabel(DEFAULT_LOGS_DIR)
+            lbl.setObjectName("Muted")
+            lbl.setWordWrap(True)
+            open_btn = QtWidgets.QPushButton("Open")
+            open_btn.clicked.connect(lambda: _open_folder(DEFAULT_LOGS_DIR))
+            logs_row.addWidget(lbl, 1)
+            logs_row.addWidget(open_btn)
+            logs_w = QtWidgets.QWidget()
+            logs_w.setLayout(logs_row)
+            form.addRow("Logs folder:", logs_w)
+
+            bb = QtWidgets.QDialogButtonBox(
+                QtWidgets.QDialogButtonBox.Save | QtWidgets.QDialogButtonBox.Cancel)
+            bb.accepted.connect(self._save)
+            bb.rejected.connect(self.reject)
+            form.addRow(bb)
+
+        def _save(self):
+            dark = self.chk_dark.isChecked()
+            self.main.act_dark.setChecked(dark)  # keeps the View-menu item in sync
+            self.main._toggle_theme(dark)
+            u = self.units_combo.currentData()
+            self.main._set_units(u)
+            for a in self.main._units_group.actions():
+                a.setChecked(a.data() == u)
+            self.main._set_profile(self.prof_combo.currentData())
+            self.settings.setValue("ui/check_updates", self.chk_update.isChecked())
+            self.main.act_update_startup.setChecked(self.chk_update.isChecked())
+            self.accept()
+
     class AiSettingsDialog(QtWidgets.QDialog):
         """Provider / model / API-key configuration (kept off the chat page)."""
 
@@ -3830,32 +3939,36 @@ if _HAVE_QT:
             sv = QtWidgets.QVBoxLayout(self.sidebar)
             sv.setContentsMargins(12, 16, 12, 16)
             sv.setSpacing(4)
-            brand = QtWidgets.QLabel("⛽ OBD Toolkit")
+            brand_row = QtWidgets.QHBoxLayout()
+            # Indent the logo so it lines up under the nav-button icons (which sit
+            # inside the buttons' 12px left padding).
+            brand_row.setContentsMargins(12, 0, 0, 0)
+            brand_row.setSpacing(8)
+            logo = QtWidgets.QLabel()
+            _ico = _find_app_icon()
+            if _ico:
+                logo.setPixmap(QtGui.QIcon(_ico).pixmap(20, 20))
+            brand_row.addWidget(logo)
+            brand = QtWidgets.QLabel("OBD Toolkit")
             brand.setObjectName("Brand")
-            sv.addWidget(brand)
-            sv.addSpacing(10)
+            brand_row.addWidget(brand)
+            brand_row.addStretch(1)
+            sv.addLayout(brand_row)
+            sv.addSpacing(12)
+
             self._nav = {}
-            for key, label in (("dashboard", "▦  Dashboard"), ("files", "📈  Files"),
-                               ("live", "⏱  Live"), ("ai", "🤖  AI Assistant")):
-                b = QtWidgets.QToolButton()
-                b.setObjectName("Nav")
-                b.setText(label)
-                b.setCheckable(True)
-                b.setToolButtonStyle(QtCore.Qt.ToolButtonTextOnly)
-                b.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
-                b.setMinimumHeight(40)
-                b.clicked.connect(lambda _c=False, k=key: self.show_page(k))
-                sv.addWidget(b)
-                self._nav[key] = b
+            self._nav_action = {}
+            for key, label in (("dashboard", "Dashboard"), ("files", "Files"),
+                               ("live", "Live"), ("ai", "AI Assistant")):
+                self._nav[key] = self._make_nav(key, label, lambda k=key: self.show_page(k))
+                sv.addWidget(self._nav[key])
             sv.addStretch(1)
-            garage_btn = QtWidgets.QToolButton()
-            garage_btn.setObjectName("Nav")
-            garage_btn.setText("🚗  Garage")
-            garage_btn.setToolButtonStyle(QtCore.Qt.ToolButtonTextOnly)
-            garage_btn.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
-            garage_btn.setMinimumHeight(40)
-            garage_btn.clicked.connect(self.show_garage)
+            garage_btn = self._make_nav("garage", "Garage", self.show_garage)
             sv.addWidget(garage_btn)
+            self._nav_action["garage"] = garage_btn
+            settings_btn = self._make_nav("settings", "Settings", self.show_settings)
+            sv.addWidget(settings_btn)
+            self._nav_action["settings"] = settings_btn
             h.addWidget(self.sidebar)
 
             # --- main content area (banner + stacked pages) ----------------- #
@@ -3930,6 +4043,10 @@ if _HAVE_QT:
                 units_menu.addAction(a)
 
             tools_menu = self.menuBar().addMenu("&Tools")
+            settings_action = QtGui.QAction("&Settings…", self)
+            settings_action.triggered.connect(self.show_settings)
+            tools_menu.addAction(settings_action)
+            tools_menu.addSeparator()
             mcp_action = QtGui.QAction("Install &MCP Server (for Claude)…", self)
             mcp_action.triggered.connect(self.show_mcp_install)
             tools_menu.addAction(mcp_action)
@@ -3995,6 +4112,31 @@ if _HAVE_QT:
             show_default = self.settings.value("ui/show_tour", True, type=bool)
             QuickTourDialog(self.settings, show_default, self).exec()
 
+        def _make_nav(self, key, label, slot):
+            b = QtWidgets.QToolButton()
+            b.setObjectName("Nav")
+            b.setText("  " + label)
+            if key in ("dashboard", "files", "live", "ai"):
+                b.setCheckable(True)
+            b.setToolButtonStyle(QtCore.Qt.ToolButtonTextBesideIcon)
+            b.setIconSize(QtCore.QSize(18, 18))
+            b.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+            b.setMinimumHeight(40)
+            b.clicked.connect(lambda _c=False: slot())
+            return b
+
+        def _refresh_nav_icons(self):
+            if not hasattr(self, "_nav"):
+                return
+            dark = self.settings.value("ui/dark", True, type=bool)
+            muted = "#A8AEB8" if dark else "#4A5568"
+            accent = "#FF6A00" if dark else "#0066CC"
+            cur = next((k for k, b in self._nav.items() if b.isChecked()), None)
+            for k, b in self._nav.items():
+                b.setIcon(_svg_icon(k, accent if k == cur else muted))
+            for k, b in self._nav_action.items():
+                b.setIcon(_svg_icon(k, muted))
+
         def show_page(self, key: str):
             idx = self._page_index.get(key)
             if idx is None:
@@ -4002,15 +4144,21 @@ if _HAVE_QT:
             self.stack.setCurrentIndex(idx)
             for k, b in self._nav.items():
                 b.setChecked(k == key)
+            self._refresh_nav_icons()
             if key == "ai":
                 self.ai_tab.refresh_vehicle()
             elif key == "dashboard":
                 self.dashboard.refresh()
 
+        def show_settings(self):
+            if SettingsDialog(self).exec():
+                self._refresh_nav_icons()
+
         def _apply_theme(self, dark: bool):
             apply_theme(dark)
             self.analyzer.plot.set_theme(dark)
             self.live_tab.plot.set_theme(dark)
+            self._refresh_nav_icons()
 
         def _toggle_theme(self, on: bool):
             self.settings.setValue("ui/dark", on)

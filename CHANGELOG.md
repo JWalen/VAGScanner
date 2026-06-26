@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.22.0] - 2026-06-26
+
+### Changed
+- **UI polish.** Replaced emoji navigation glyphs with crisp, theme-tinted **SVG
+  line icons** (lucide, ISC-licensed), added the **app logo** to the sidebar, and
+  **aligned the sidebar consistently** (logo lines up with the nav icons).
+- **Unified Settings page** (sidebar gear / Tools → Settings…): theme, units,
+  default vehicle profile, startup update check, AI provider & key, and the logs
+  folder — all in one place instead of scattered across menus.
+
 ## [1.21.1] - 2026-06-26
 
 ### Added
@@ -599,7 +609,8 @@ First public release.
   installer, and publishes a GitHub Release on each `v*` tag.
 - 54-test pytest suite (no hardware; the live path is mocked).
 
-[Unreleased]: https://github.com/JWalen/VAGScanner/compare/v1.21.1...HEAD
+[Unreleased]: https://github.com/JWalen/VAGScanner/compare/v1.22.0...HEAD
+[1.22.0]: https://github.com/JWalen/VAGScanner/releases/tag/v1.22.0
 [1.21.1]: https://github.com/JWalen/VAGScanner/releases/tag/v1.21.1
 [1.21.0]: https://github.com/JWalen/VAGScanner/releases/tag/v1.21.0
 [1.20.0]: https://github.com/JWalen/VAGScanner/releases/tag/v1.20.0

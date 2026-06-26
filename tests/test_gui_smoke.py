@@ -246,6 +246,28 @@ def test_live_session_dir_per_vehicle(qapp, tmp_path, monkeypatch):
     win.close()
 
 
+def test_svg_icons_and_nav(qapp):
+    icon = gui_app._svg_icon("dashboard", "#FF6A00")
+    assert not icon.isNull()
+    win = gui_app.MainWindow()
+    # sidebar nav buttons carry icons now (not emoji text)
+    assert not win._nav["dashboard"].icon().isNull()
+    assert not win._nav_action["settings"].icon().isNull()
+    win.close()
+
+
+def test_settings_dialog(qapp):
+    win = gui_app.MainWindow()
+    dlg = gui_app.SettingsDialog(win)
+    assert dlg.prof_combo.count() == len(gui_app.profiles.PROFILES)
+    dlg.chk_dark.setChecked(False)
+    dlg.units_combo.setCurrentIndex(1)  # Metric
+    dlg._save()
+    assert win.settings.value("ui/dark", type=bool) is False
+    win.settings.setValue("ui/dark", True)  # restore
+    win.close()
+
+
 def test_markdown_rendering():
     h = gui_app._md_to_html("# Title\n\n- one\n- two\n\n**bold** and `code`")
     assert "<b>Title</b>" in h
