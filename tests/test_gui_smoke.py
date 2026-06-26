@@ -111,6 +111,27 @@ def test_logs_dir_is_not_rosstech(monkeypatch):
     assert gui_app._default_logs_dir() == "X:/custom-logs"
 
 
+def test_maintenance_dialog(qapp, tmp_path, monkeypatch):
+    from vcds_core import garage
+    gpath = str(tmp_path / "garage.json")
+    garage.save_garage(gpath, [garage.Vehicle(vin="WAUZZZ8K9BA123456", make="Audi", year=2011)])
+    monkeypatch.setattr(gui_app, "DEFAULT_LOGS_DIR", str(tmp_path))
+
+    win = gui_app.MainWindow()
+    win.settings.setValue("garage/active_vin", "WAUZZZ8K9BA123456")
+    dlg = gui_app.MaintenanceDialog(win)
+    assert dlg.veh is not None
+    dlg.svc_type.setCurrentText("Oil change")
+    dlg.svc_mi.setValue(45000)
+    dlg.svc_int.setValue(7500)
+    dlg._add_service()
+    assert dlg.svc_list.count() >= 1
+    reloaded = garage.find(garage.load_garage(gpath), "WAUZZZ8K9BA123456")
+    assert reloaded.maintenance and reloaded.odometer == 45000
+    win.settings.setValue("garage/active_vin", "")
+    win.close()
+
+
 def test_performance_dialog_dyno(qapp, tmp_path):
     from vcds_core import parse
     rows = ["TIME,Engine RPM,Vehicle Speed,Boost (derived)", "s,/min,km/h,kPa"]

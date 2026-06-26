@@ -23,6 +23,9 @@ class Vehicle:
     notes: str = ""
     sessions: List[str] = field(default_factory=list)
     chat: List[dict] = field(default_factory=list)  # per-vehicle AI conversation
+    odometer: Optional[float] = None
+    maintenance: List[dict] = field(default_factory=list)  # service records
+    fuel: List[dict] = field(default_factory=list)         # fill-up log
 
     @property
     def label(self) -> str:
@@ -97,6 +100,68 @@ def log_folder_name(vehicle: "Vehicle") -> str:
         base = " ".join(bits) or "vehicle"
     tail = (vehicle.vin or "").strip()[-6:]
     return _safe_dirname(f"{base} {tail}" if tail else base)
+
+
+def add_maintenance(vehicles: List[Vehicle], vin: str, record: dict) -> bool:
+    """Append a service record: {type, mileage, date, interval_miles, cost, notes}."""
+    v = find(vehicles, vin)
+    if v is None:
+        return False
+    v.maintenance.append(record)
+    if record.get("mileage") is not None:
+        v.odometer = max(v.odometer or 0, float(record["mileage"]))
+    return True
+
+
+def add_fuel(vehicles: List[Vehicle], vin: str, entry: dict) -> bool:
+    """Append a fill-up: {mileage, volume, cost, date}."""
+    v = find(vehicles, vin)
+    if v is None:
+        return False
+    v.fuel.append(entry)
+    if entry.get("mileage") is not None:
+        v.odometer = max(v.odometer or 0, float(entry["mileage"]))
+    return True
+
+
+def maintenance_due(vehicle: "Vehicle", current_odo: Optional[float] = None) -> List[dict]:
+    """For each service record with an interval, how far until it's due again."""
+    odo = current_odo if current_odo is not None else vehicle.odometer
+    out = []
+    for r in vehicle.maintenance:
+        interval = r.get("interval_miles")
+        at = r.get("mileage")
+        if not interval or at is None:
+            continue
+        next_due = float(at) + float(interval)
+        remaining = (next_due - odo) if odo is not None else None
+        out.append({"type": r.get("type", "service"), "next_due": next_due,
+                    "remaining": remaining,
+                    "overdue": (remaining is not None and remaining < 0)})
+    return out
+
+
+def fuel_stats(vehicle: "Vehicle") -> Optional[dict]:
+    """Aggregate the fill-up log into distance / volume / cost (unit-neutral)."""
+    fills = [f for f in vehicle.fuel if f.get("mileage") is not None]
+    if not vehicle.fuel:
+        return None
+    total_cost = sum(float(f.get("cost") or 0) for f in vehicle.fuel)
+    total_vol = sum(float(f.get("volume") or 0) for f in vehicle.fuel)
+    stats = {"fills": len(vehicle.fuel), "total_cost": total_cost, "total_volume": total_vol,
+             "distance": None, "vol_per_100": None, "cost_per_dist": None}
+    if len(fills) >= 2:
+        miles = sorted(float(f["mileage"]) for f in fills)
+        dist = miles[-1] - miles[0]
+        # fuel burned over that distance = all volume except the first (baseline) fill
+        ordered = sorted(fills, key=lambda f: float(f["mileage"]))
+        vol_since_first = sum(float(f.get("volume") or 0) for f in ordered[1:])
+        if dist > 0:
+            stats["distance"] = dist
+            if vol_since_first > 0:
+                stats["vol_per_100"] = vol_since_first / dist * 100.0
+            stats["cost_per_dist"] = total_cost / dist
+    return stats
 
 
 def get_chat(vehicles: List[Vehicle], vin: str) -> List[dict]:

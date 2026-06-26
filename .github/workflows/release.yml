@@ -69,7 +69,23 @@ jobs:
         shell: bash
         env:
           QT_QPA_PLATFORM: offscreen
-        run: pytest -q
+        run: |
+          # The offscreen-Qt platform can segfault in C++ destructors during
+          # interpreter shutdown AFTER all tests pass, corrupting the exit code.
+          # Judge the run by the JUnit results (written before that crash), not
+          # by the process exit code.
+          set +e
+          pytest -q --junitxml=test-results.xml
+          set -e
+          python - <<'PY'
+          import sys, xml.etree.ElementTree as ET
+          root = ET.parse("test-results.xml").getroot()
+          suites = [root] if root.tag == "testsuite" else list(root.iter("testsuite"))
+          bad = sum(int(s.get("failures", 0)) + int(s.get("errors", 0)) for s in suites)
+          total = sum(int(s.get("tests", 0)) for s in suites)
+          print(f"{total} tests, {bad} failures/errors")
+          sys.exit(1 if bad or total == 0 else 0)
+          PY
 
       - name: Build sdist + wheel
         shell: bash

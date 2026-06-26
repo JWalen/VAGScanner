@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.10.0] - 2026-06-26
+
+### Added
+- **Maintenance & Reminders** (Tools → Maintenance & Reminders…): per-vehicle
+  **odometer**, a **service log** with **mileage-based reminders** (oil, belts,
+  fluids — overdue flagged in red, upcoming in amber), and a **fuel/cost log**
+  with running economy and total spend. Stored per vehicle in the garage.
+
+### Fixed
+- Release CI now judges the test run by its JUnit results rather than the process
+  exit code, so the harmless offscreen-Qt shutdown segfault no longer fails an
+  all-green build. (This had blocked the 1.9.0 release; its performance pack ships
+  here.)
+
 ## [1.9.0] - 2026-06-26
 
 ### Added
@@ -464,7 +478,8 @@ First public release.
   installer, and publishes a GitHub Release on each `v*` tag.
 - 54-test pytest suite (no hardware; the live path is mocked).
 
-[Unreleased]: https://github.com/JWalen/VAGScanner/compare/v1.9.0...HEAD
+[Unreleased]: https://github.com/JWalen/VAGScanner/compare/v1.10.0...HEAD
+[1.10.0]: https://github.com/JWalen/VAGScanner/releases/tag/v1.10.0
 [1.9.0]: https://github.com/JWalen/VAGScanner/releases/tag/v1.9.0
 [1.8.0]: https://github.com/JWalen/VAGScanner/releases/tag/v1.8.0
 [1.7.0]: https://github.com/JWalen/VAGScanner/releases/tag/v1.7.0

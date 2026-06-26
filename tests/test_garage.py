@@ -50,6 +50,32 @@ def test_chat_roundtrip(tmp_path):
     assert not garage.set_chat(loaded, "NOPE", [])
 
 
+def test_maintenance_due_and_overdue():
+    vehicles = [garage.Vehicle(vin="V1", odometer=53000)]
+    garage.add_maintenance(vehicles, "V1",
+                           {"type": "Oil change", "mileage": 45000, "interval_miles": 7500})
+    garage.add_maintenance(vehicles, "V1",
+                           {"type": "Brake fluid", "mileage": 40000, "interval_miles": 20000})
+    due = {d["type"]: d for d in garage.maintenance_due(vehicles[0])}
+    # oil: next due 52,500 -> overdue at 53,000
+    assert due["Oil change"]["overdue"] and due["Oil change"]["remaining"] < 0
+    # brake fluid: next due 60,000 -> 7,000 to go
+    assert not due["Brake fluid"]["overdue"]
+    assert abs(due["Brake fluid"]["remaining"] - 7000) < 1
+
+
+def test_fuel_stats():
+    vehicles = [garage.Vehicle(vin="V1")]
+    garage.add_fuel(vehicles, "V1", {"mileage": 1000, "volume": 10, "cost": 40})
+    garage.add_fuel(vehicles, "V1", {"mileage": 1300, "volume": 12, "cost": 48})
+    st = garage.fuel_stats(vehicles[0])
+    assert st["fills"] == 2 and st["total_cost"] == 88
+    assert st["distance"] == 300
+    # 12 vol over 300 dist -> 4.0 vol/100
+    assert abs(st["vol_per_100"] - 4.0) < 1e-6
+    assert vehicles[0].odometer == 1300  # odometer advanced
+
+
 def test_log_folder_name():
     v = garage.Vehicle(vin="WAUZZZ8K9BA123456", make="Audi", year=2011)
     assert garage.log_folder_name(v) == "2011_Audi_123456"

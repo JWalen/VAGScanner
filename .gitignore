@@ -40,3 +40,4 @@ installer/Output/
 installer/build/
 installer/dist/
 src/vcds_core/_version.py
+test-results.xml

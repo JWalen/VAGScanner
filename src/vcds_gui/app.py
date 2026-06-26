@@ -2997,6 +2997,160 @@ if _HAVE_QT:
     # --------------------------------------------------------------------- #
     # Main window
     # --------------------------------------------------------------------- #
+    class MaintenanceDialog(QtWidgets.QDialog):
+        """Per-vehicle service log, mileage reminders and a fuel/cost log."""
+
+        SERVICE_TYPES = ["Oil change", "Oil filter", "Air filter", "Brake fluid", "Coolant",
+                         "Spark plugs", "Trans fluid", "Timing belt", "Tires", "Inspection",
+                         "Other"]
+
+        def __init__(self, main_window, parent=None):
+            super().__init__(parent)
+            self.main = main_window
+            self.setWindowTitle("Maintenance & Reminders")
+            self.resize(660, 640)
+            self.path = os.path.join(DEFAULT_LOGS_DIR, "garage.json")
+            self.vin = main_window.settings.value("garage/active_vin", "", type=str)
+            self.vehicles = garage_mod.load_garage(self.path)
+            self.veh = garage_mod.find(self.vehicles, self.vin) if self.vin else None
+
+            v = QtWidgets.QVBoxLayout(self)
+            if self.veh is None:
+                v.addWidget(QtWidgets.QLabel(
+                    "No active vehicle. Open the Garage and Set Active, or read Vehicle Info "
+                    "(Live tab) to add your car first."))
+                bb = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Close)
+                bb.rejected.connect(self.reject)
+                v.addWidget(bb)
+                return
+
+            v.addWidget(QtWidgets.QLabel(f"<b>{self.veh.label}</b> &nbsp; · &nbsp; VIN {self.veh.vin}"))
+            orow = QtWidgets.QHBoxLayout()
+            orow.addWidget(QtWidgets.QLabel("Odometer:"))
+            self.odo = QtWidgets.QDoubleSpinBox()
+            self.odo.setRange(0, 2_000_000)
+            self.odo.setDecimals(0)
+            self.odo.setMaximumWidth(150)
+            self.odo.setValue(self.veh.odometer or 0)
+            orow.addWidget(self.odo)
+            bsave = QtWidgets.QPushButton("Save")
+            bsave.clicked.connect(self._save_odo)
+            orow.addWidget(bsave)
+            orow.addStretch(1)
+            v.addLayout(orow)
+
+            v.addWidget(QtWidgets.QLabel("<b>Service log &amp; reminders</b>"))
+            self.svc_list = QtWidgets.QListWidget()
+            v.addWidget(self.svc_list, 1)
+            srow = QtWidgets.QHBoxLayout()
+            self.svc_type = QtWidgets.QComboBox()
+            self.svc_type.addItems(self.SERVICE_TYPES)
+            self.svc_type.setEditable(True)
+            self.svc_mi = QtWidgets.QDoubleSpinBox()
+            self.svc_mi.setRange(0, 2_000_000)
+            self.svc_mi.setDecimals(0)
+            self.svc_mi.setPrefix("at ")
+            self.svc_int = QtWidgets.QDoubleSpinBox()
+            self.svc_int.setRange(0, 200_000)
+            self.svc_int.setDecimals(0)
+            self.svc_int.setPrefix("every ")
+            self.svc_cost = QtWidgets.QDoubleSpinBox()
+            self.svc_cost.setRange(0, 100_000)
+            self.svc_cost.setPrefix("$")
+            badd = QtWidgets.QPushButton("Add")
+            badd.clicked.connect(self._add_service)
+            for w in (self.svc_type, self.svc_mi, self.svc_int, self.svc_cost, badd):
+                srow.addWidget(w)
+            v.addLayout(srow)
+
+            v.addWidget(QtWidgets.QLabel("<b>Fuel log</b>"))
+            self.fuel_stats = QtWidgets.QLabel("")
+            self.fuel_stats.setObjectName("Muted")
+            v.addWidget(self.fuel_stats)
+            frow = QtWidgets.QHBoxLayout()
+            self.fuel_mi = QtWidgets.QDoubleSpinBox()
+            self.fuel_mi.setRange(0, 2_000_000)
+            self.fuel_mi.setDecimals(0)
+            self.fuel_mi.setPrefix("at ")
+            self.fuel_vol = QtWidgets.QDoubleSpinBox()
+            self.fuel_vol.setRange(0, 1000)
+            self.fuel_vol.setPrefix("vol ")
+            self.fuel_cost = QtWidgets.QDoubleSpinBox()
+            self.fuel_cost.setRange(0, 100_000)
+            self.fuel_cost.setPrefix("$")
+            fadd = QtWidgets.QPushButton("Add fill-up")
+            fadd.clicked.connect(self._add_fuel)
+            for w in (self.fuel_mi, self.fuel_vol, self.fuel_cost, fadd):
+                frow.addWidget(w)
+            v.addLayout(frow)
+
+            bb = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Close)
+            bb.rejected.connect(self.reject)
+            bb.accepted.connect(self.accept)
+            v.addWidget(bb)
+            self._refresh()
+
+        def _save(self):
+            garage_mod.save_garage(self.path, self.vehicles)
+
+        def _save_odo(self):
+            self.veh.odometer = self.odo.value()
+            self._save()
+            self._refresh()
+
+        def _add_service(self):
+            self.veh.maintenance.append({
+                "type": self.svc_type.currentText().strip() or "Service",
+                "mileage": self.svc_mi.value(),
+                "interval_miles": self.svc_int.value() or None,
+                "cost": self.svc_cost.value() or None,
+                "date": time.strftime("%Y-%m-%d")})
+            self.veh.odometer = max(self.veh.odometer or 0, self.svc_mi.value())
+            self.odo.setValue(self.veh.odometer)
+            self._save()
+            self._refresh()
+
+        def _add_fuel(self):
+            self.veh.fuel.append({
+                "mileage": self.fuel_mi.value(), "volume": self.fuel_vol.value(),
+                "cost": self.fuel_cost.value() or None, "date": time.strftime("%Y-%m-%d")})
+            self.veh.odometer = max(self.veh.odometer or 0, self.fuel_mi.value())
+            self.odo.setValue(self.veh.odometer)
+            self._save()
+            self._refresh()
+
+        def _refresh(self):
+            self.svc_list.clear()
+            for r in self.veh.maintenance:
+                line = f"{r.get('date', '')}   {r.get('type')}   at {float(r.get('mileage') or 0):,.0f}"
+                if r.get("cost"):
+                    line += f"   ${float(r['cost']):,.0f}"
+                self.svc_list.addItem(line)
+            for d in garage_mod.maintenance_due(self.veh):
+                if d["remaining"] is None:
+                    continue
+                if d["overdue"]:
+                    it = QtWidgets.QListWidgetItem(
+                        f"⚠  {d['type']} OVERDUE by {abs(d['remaining']):,.0f}")
+                    it.setForeground(QtGui.QColor("#E10600"))
+                else:
+                    it = QtWidgets.QListWidgetItem(
+                        f"•  {d['type']} due in {d['remaining']:,.0f}  (at {d['next_due']:,.0f})")
+                    it.setForeground(QtGui.QColor("#DD6B20") if d["remaining"] < 1000
+                                     else QtGui.QColor("#38A169"))
+                self.svc_list.addItem(it)
+            st = garage_mod.fuel_stats(self.veh)
+            if st:
+                txt = (f"{st['fills']} fill-ups · ${st['total_cost']:,.0f} total · "
+                       f"{st['total_volume']:,.0f} vol")
+                if st.get("vol_per_100"):
+                    txt += f" · {st['vol_per_100']:.1f} vol / 100 dist"
+                if st.get("cost_per_dist"):
+                    txt += f" · ${st['cost_per_dist']:.2f}/dist"
+                self.fuel_stats.setText(txt)
+            else:
+                self.fuel_stats.setText("No fill-ups logged yet.")
+
     class DashboardPage(QtWidgets.QWidget):
         """Landing page: quick actions, vehicle status and recent logs."""
 
@@ -3261,6 +3415,9 @@ if _HAVE_QT:
             garage_action = QtGui.QAction("&Garage…", self)
             garage_action.triggered.connect(self.show_garage)
             tools_menu.addAction(garage_action)
+            maint_action = QtGui.QAction("&Maintenance & Reminders…", self)
+            maint_action.triggered.connect(self.show_maintenance)
+            tools_menu.addAction(maint_action)
             resets_action = QtGui.QAction("&Resets / Service…", self)
             resets_action.triggered.connect(self.show_resets)
             tools_menu.addAction(resets_action)
@@ -3359,6 +3516,9 @@ if _HAVE_QT:
 
         def show_garage(self):
             GarageDialog(self, self).exec()
+
+        def show_maintenance(self):
+            MaintenanceDialog(self, self).exec()
 
         def show_resets(self):
             ResetsDialog(self, self).exec()
