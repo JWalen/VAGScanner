@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.10.1] - 2026-06-26
+
+### Fixed
+- **macOS `.dmg` build** could intermittently fail with `hdiutil: Resource busy`
+  (Spotlight indexing the fresh `.app`); the packaging step now retries. Also made
+  the GitHub-release step idempotent for re-runs.
+
 ## [1.10.0] - 2026-06-26
 
 ### Added
@@ -478,7 +485,8 @@ First public release.
   installer, and publishes a GitHub Release on each `v*` tag.
 - 54-test pytest suite (no hardware; the live path is mocked).
 
-[Unreleased]: https://github.com/JWalen/VAGScanner/compare/v1.10.0...HEAD
+[Unreleased]: https://github.com/JWalen/VAGScanner/compare/v1.10.1...HEAD
+[1.10.1]: https://github.com/JWalen/VAGScanner/releases/tag/v1.10.1
 [1.10.0]: https://github.com/JWalen/VAGScanner/releases/tag/v1.10.0
 [1.9.0]: https://github.com/JWalen/VAGScanner/releases/tag/v1.9.0
 [1.8.0]: https://github.com/JWalen/VAGScanner/releases/tag/v1.8.0

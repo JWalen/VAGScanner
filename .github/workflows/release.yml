@@ -129,8 +129,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "$TAG" dist/*.whl dist/*.tar.gz installer/Output/*.exe \
-            --title "$TAG" \
-            --generate-notes
+            --title "$TAG" --generate-notes \
+            || gh release upload "$TAG" dist/*.whl dist/*.tar.gz installer/Output/*.exe --clobber
 
   build-macos:
     needs: release
@@ -178,8 +178,15 @@ jobs:
 
       - name: Package .dmg
         run: |
-          hdiutil create -volname "OBD Toolkit" -srcfolder "dist/OBD Toolkit.app" \
-            -ov -format UDZO "OBD-Toolkit-$OBD_VERSION.dmg"
+          # hdiutil can intermittently fail with "Resource busy" while Spotlight
+          # indexes the freshly-built .app — retry a few times.
+          dmg="OBD-Toolkit-$OBD_VERSION.dmg"
+          for i in 1 2 3 4; do
+            hdiutil create -volname "OBD Toolkit" -srcfolder "dist/OBD Toolkit.app" \
+              -ov -format UDZO "$dmg" && break
+            echo "hdiutil busy — retry $i"; sleep 10
+          done
+          test -f "$dmg"
 
       - name: Upload .dmg to the release
         env:
