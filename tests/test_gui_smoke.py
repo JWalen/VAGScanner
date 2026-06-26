@@ -138,6 +138,25 @@ def test_ai_export_chat(qapp, tmp_path, monkeypatch):
     win.close()
 
 
+def test_crash_handling_installs(tmp_path, monkeypatch):
+    import logging
+    import logging.handlers
+    import sys
+
+    monkeypatch.setattr(gui_app, "DEFAULT_LOGS_DIR", str(tmp_path))
+    old_hook = sys.excepthook
+    try:
+        path = gui_app._install_crash_handling()
+        assert path.endswith("obd_toolkit.log")
+        assert sys.excepthook is not old_hook  # global handler installed
+    finally:
+        sys.excepthook = old_hook
+        for h in list(logging.getLogger().handlers):
+            if isinstance(h, logging.handlers.RotatingFileHandler):
+                logging.getLogger().removeHandler(h)
+                h.close()
+
+
 def test_logs_dir_is_not_rosstech(monkeypatch):
     monkeypatch.delenv("VCDS_LOGS_DIR", raising=False)
     d = gui_app._default_logs_dir()
@@ -387,7 +406,7 @@ def test_update_banner_shows_on_found(qapp):
     assert win.update_banner.isHidden()  # nothing yet
     info = UpdateInfo(
         version="9.9.9", tag="v9.9.9", name="v9.9.9", notes="notes",
-        html_url="https://github.com/JWalen/VAGScanner/releases/tag/v9.9.9",
+        html_url="https://github.com/JWalen/OBD-Toolkit/releases/tag/v9.9.9",
         installer_url="https://example.test/setup.exe", installer_name="setup.exe",
         installer_size=10, sha256=None,
     )

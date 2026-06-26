@@ -20,7 +20,7 @@ import urllib.request
 from dataclasses import dataclass
 from typing import Callable, Optional
 
-REPO = "JWalen/VAGScanner"
+REPO = "JWalen/OBD-Toolkit"
 _API = "https://api.github.com/repos/{repo}/releases/latest"
 
 # Injectable opener: callable(request, timeout) -> context-manager response.

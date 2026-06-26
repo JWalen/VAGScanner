@@ -15,7 +15,7 @@
 #define MyAppName "VCDS Toolkit"
 #define MyAppPublisher "DeltaModTech"
 #define MyAppExeName "VCDS Toolkit.exe"
-#define MyAppURL "https://github.com/JWalen/VAGScanner"
+#define MyAppURL "https://github.com/JWalen/OBD-Toolkit"
 
 ; Path to the PyInstaller one-folder output (relative to this script).
 #define BuildDir "..\dist\VCDS Toolkit"

@@ -1921,7 +1921,7 @@ if _HAVE_QT:
     </ul>
 
     <p>Project &amp; docs:
-    <a href="https://github.com/JWalen/VAGScanner">github.com/JWalen/VAGScanner</a></p>
+    <a href="https://github.com/JWalen/OBD-Toolkit">github.com/JWalen/OBD-Toolkit</a></p>
     """
 
     class HelpDialog(QtWidgets.QDialog):
@@ -4283,8 +4283,8 @@ if _HAVE_QT:
                 "Brand-specific diagnosis is selected via "
                 "<b>View → Vehicle profile</b>. Live data is from a generic "
                 "ELM327; it does not control VCDS or the HEX cable.<br><br>"
-                '<a href="https://github.com/JWalen/VAGScanner">'
-                "github.com/JWalen/VAGScanner</a>",
+                '<a href="https://github.com/JWalen/OBD-Toolkit">'
+                "github.com/JWalen/OBD-Toolkit</a>",
             )
 
         # -- updates -------------------------------------------------------- #
@@ -4543,6 +4543,51 @@ def _export_clip(mlog: "parse.MeasuringLog", path: str, xmin: float, xmax: float
     return len(rows)
 
 
+def _install_crash_handling() -> str:
+    """Log to a rotating file and surface unhandled exceptions instead of dying
+    silently. Returns the log file path."""
+    import logging
+    import logging.handlers
+    import tempfile
+
+    log_dir = DEFAULT_LOGS_DIR
+    try:
+        os.makedirs(log_dir, exist_ok=True)
+    except OSError:
+        log_dir = tempfile.gettempdir()
+    log_path = os.path.join(log_dir, "obd_toolkit.log")
+
+    root = logging.getLogger()
+    root.setLevel(logging.INFO)
+    if not any(isinstance(h, logging.handlers.RotatingFileHandler) for h in root.handlers):
+        handler = logging.handlers.RotatingFileHandler(
+            log_path, maxBytes=512_000, backupCount=3, encoding="utf-8")
+        handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
+        root.addHandler(handler)
+    log = logging.getLogger("obd_toolkit")
+    try:
+        from vcds_core import __version__ as _ver
+        log.info("OBD Toolkit %s starting on %s", _ver, sys.platform)
+    except Exception:  # noqa: BLE001
+        pass
+
+    def _hook(exc_type, exc, tb):
+        if issubclass(exc_type, KeyboardInterrupt):
+            sys.__excepthook__(exc_type, exc, tb)
+            return
+        log.error("Unhandled exception", exc_info=(exc_type, exc, tb))
+        try:
+            if QtWidgets.QApplication.instance() is not None:
+                QtWidgets.QMessageBox.critical(
+                    None, "Unexpected error",
+                    f"Something went wrong:\n\n{exc}\n\nThe details were written to:\n{log_path}")
+        except Exception:  # noqa: BLE001
+            pass
+
+    sys.excepthook = _hook
+    return log_path
+
+
 def main() -> int:
     """Console entry point: launch the desktop GUI."""
     if not _HAVE_QT:
@@ -4552,6 +4597,7 @@ def main() -> int:
             f"(import error: {_IMPORT_ERR})\n"
         )
         return 1
+    _install_crash_handling()
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication(sys.argv)
     win = MainWindow()
     win.show()

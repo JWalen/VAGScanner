@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.25.0] - 2026-06-26
+
+### Changed
+- **Repo renamed** to `OBD-Toolkit` (old links auto-redirect); updater, About and
+  docs point at the new URL.
+
+### Added
+- **Crash/error logging.** A rotating log (`obd_toolkit.log` in the logs folder)
+  plus a global exception handler — unhandled errors are logged and shown in a
+  dialog instead of dying silently.
+- **`THIRD_PARTY_NOTICES.md`** documenting bundled components and their licenses,
+  including the important **python-OBD GPL-2.0** consideration for distribution.
+
 ## [1.24.0] - 2026-06-26
 
 ### Added
@@ -625,58 +638,59 @@ First public release.
   installer, and publishes a GitHub Release on each `v*` tag.
 - 54-test pytest suite (no hardware; the live path is mocked).
 
-[Unreleased]: https://github.com/JWalen/VAGScanner/compare/v1.24.0...HEAD
-[1.24.0]: https://github.com/JWalen/VAGScanner/releases/tag/v1.24.0
-[1.23.0]: https://github.com/JWalen/VAGScanner/releases/tag/v1.23.0
-[1.22.0]: https://github.com/JWalen/VAGScanner/releases/tag/v1.22.0
-[1.21.1]: https://github.com/JWalen/VAGScanner/releases/tag/v1.21.1
-[1.21.0]: https://github.com/JWalen/VAGScanner/releases/tag/v1.21.0
-[1.20.0]: https://github.com/JWalen/VAGScanner/releases/tag/v1.20.0
-[1.19.0]: https://github.com/JWalen/VAGScanner/releases/tag/v1.19.0
-[1.18.0]: https://github.com/JWalen/VAGScanner/releases/tag/v1.18.0
-[1.17.0]: https://github.com/JWalen/VAGScanner/releases/tag/v1.17.0
-[1.16.0]: https://github.com/JWalen/VAGScanner/releases/tag/v1.16.0
-[1.15.0]: https://github.com/JWalen/VAGScanner/releases/tag/v1.15.0
-[1.14.0]: https://github.com/JWalen/VAGScanner/releases/tag/v1.14.0
-[1.13.0]: https://github.com/JWalen/VAGScanner/releases/tag/v1.13.0
-[1.12.0]: https://github.com/JWalen/VAGScanner/releases/tag/v1.12.0
-[1.11.0]: https://github.com/JWalen/VAGScanner/releases/tag/v1.11.0
-[1.10.1]: https://github.com/JWalen/VAGScanner/releases/tag/v1.10.1
-[1.10.0]: https://github.com/JWalen/VAGScanner/releases/tag/v1.10.0
-[1.9.0]: https://github.com/JWalen/VAGScanner/releases/tag/v1.9.0
-[1.8.0]: https://github.com/JWalen/VAGScanner/releases/tag/v1.8.0
-[1.7.0]: https://github.com/JWalen/VAGScanner/releases/tag/v1.7.0
-[1.6.0]: https://github.com/JWalen/VAGScanner/releases/tag/v1.6.0
-[1.5.1]: https://github.com/JWalen/VAGScanner/releases/tag/v1.5.1
-[1.5.0]: https://github.com/JWalen/VAGScanner/releases/tag/v1.5.0
-[1.4.2]: https://github.com/JWalen/VAGScanner/releases/tag/v1.4.2
-[1.4.1]: https://github.com/JWalen/VAGScanner/releases/tag/v1.4.1
-[1.4.0]: https://github.com/JWalen/VAGScanner/releases/tag/v1.4.0
-[1.3.0]: https://github.com/JWalen/VAGScanner/releases/tag/v1.3.0
-[1.2.0]: https://github.com/JWalen/VAGScanner/releases/tag/v1.2.0
-[1.1.0]: https://github.com/JWalen/VAGScanner/releases/tag/v1.1.0
-[1.0.1]: https://github.com/JWalen/VAGScanner/releases/tag/v1.0.1
-[1.0.0]: https://github.com/JWalen/VAGScanner/releases/tag/v1.0.0
-[0.21.0]: https://github.com/JWalen/VAGScanner/releases/tag/v0.21.0
-[0.20.0]: https://github.com/JWalen/VAGScanner/releases/tag/v0.20.0
-[0.19.0]: https://github.com/JWalen/VAGScanner/releases/tag/v0.19.0
-[0.18.0]: https://github.com/JWalen/VAGScanner/releases/tag/v0.18.0
-[0.17.0]: https://github.com/JWalen/VAGScanner/releases/tag/v0.17.0
-[0.16.0]: https://github.com/JWalen/VAGScanner/releases/tag/v0.16.0
-[0.15.0]: https://github.com/JWalen/VAGScanner/releases/tag/v0.15.0
-[0.14.1]: https://github.com/JWalen/VAGScanner/releases/tag/v0.14.1
-[0.14.0]: https://github.com/JWalen/VAGScanner/releases/tag/v0.14.0
-[0.13.0]: https://github.com/JWalen/VAGScanner/releases/tag/v0.13.0
-[0.12.0]: https://github.com/JWalen/VAGScanner/releases/tag/v0.12.0
-[0.11.0]: https://github.com/JWalen/VAGScanner/releases/tag/v0.11.0
-[0.10.0]: https://github.com/JWalen/VAGScanner/releases/tag/v0.10.0
-[0.9.0]: https://github.com/JWalen/VAGScanner/releases/tag/v0.9.0
-[0.8.0]: https://github.com/JWalen/VAGScanner/releases/tag/v0.8.0
-[0.7.0]: https://github.com/JWalen/VAGScanner/releases/tag/v0.7.0
-[0.6.0]: https://github.com/JWalen/VAGScanner/releases/tag/v0.6.0
-[0.5.0]: https://github.com/JWalen/VAGScanner/releases/tag/v0.5.0
-[0.4.1]: https://github.com/JWalen/VAGScanner/releases/tag/v0.4.1
-[0.4.0]: https://github.com/JWalen/VAGScanner/releases/tag/v0.4.0
-[0.3.0]: https://github.com/JWalen/VAGScanner/releases/tag/v0.3.0
-[0.2.0]: https://github.com/JWalen/VAGScanner/releases/tag/v0.2.0
-[0.1.0]: https://github.com/JWalen/VAGScanner/releases/tag/v0.1.0
+[Unreleased]: https://github.com/JWalen/OBD-Toolkit/compare/v1.25.0...HEAD
+[1.25.0]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v1.25.0
+[1.24.0]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v1.24.0
+[1.23.0]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v1.23.0
+[1.22.0]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v1.22.0
+[1.21.1]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v1.21.1
+[1.21.0]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v1.21.0
+[1.20.0]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v1.20.0
+[1.19.0]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v1.19.0
+[1.18.0]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v1.18.0
+[1.17.0]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v1.17.0
+[1.16.0]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v1.16.0
+[1.15.0]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v1.15.0
+[1.14.0]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v1.14.0
+[1.13.0]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v1.13.0
+[1.12.0]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v1.12.0
+[1.11.0]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v1.11.0
+[1.10.1]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v1.10.1
+[1.10.0]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v1.10.0
+[1.9.0]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v1.9.0
+[1.8.0]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v1.8.0
+[1.7.0]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v1.7.0
+[1.6.0]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v1.6.0
+[1.5.1]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v1.5.1
+[1.5.0]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v1.5.0
+[1.4.2]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v1.4.2
+[1.4.1]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v1.4.1
+[1.4.0]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v1.4.0
+[1.3.0]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v1.3.0
+[1.2.0]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v1.2.0
+[1.1.0]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v1.1.0
+[1.0.1]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v1.0.1
+[1.0.0]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v1.0.0
+[0.21.0]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v0.21.0
+[0.20.0]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v0.20.0
+[0.19.0]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v0.19.0
+[0.18.0]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v0.18.0
+[0.17.0]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v0.17.0
+[0.16.0]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v0.16.0
+[0.15.0]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v0.15.0
+[0.14.1]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v0.14.1
+[0.14.0]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v0.14.0
+[0.13.0]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v0.13.0
+[0.12.0]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v0.12.0
+[0.11.0]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v0.11.0
+[0.10.0]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v0.10.0
+[0.9.0]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v0.9.0
+[0.8.0]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v0.8.0
+[0.7.0]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v0.7.0
+[0.6.0]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v0.6.0
+[0.5.0]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v0.5.0
+[0.4.1]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v0.4.1
+[0.4.0]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v0.4.0
+[0.3.0]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v0.3.0
+[0.2.0]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v0.2.0
+[0.1.0]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v0.1.0

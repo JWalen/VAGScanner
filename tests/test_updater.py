@@ -45,7 +45,7 @@ def _release_json(tag="v0.2.0", installer_bytes=b"FAKE-INSTALLER", with_digest=T
         "tag_name": tag,
         "name": tag,
         "body": "Shiny new release.",
-        "html_url": f"https://github.com/JWalen/VAGScanner/releases/tag/{tag}",
+        "html_url": f"https://github.com/JWalen/OBD-Toolkit/releases/tag/{tag}",
         "assets": [
             {"name": "vcds_toolkit-0.2.0-py3-none-any.whl", "browser_download_url": "x", "size": 1},
             asset,
