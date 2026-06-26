@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-06-26
+
+### Added
+- **Live alert HUD.** During logging, the Live tab now **flashes a red banner and
+  beeps** the moment a threshold rule is breached (e.g. coolant > 110, boost >
+  limit, AFR too lean), and clears when values return to normal. Toggle with the
+  **🔔 Alerts** checkbox.
+
 ## [1.7.0] - 2026-06-26
 
 ### Added
@@ -448,7 +456,8 @@ First public release.
   installer, and publishes a GitHub Release on each `v*` tag.
 - 54-test pytest suite (no hardware; the live path is mocked).
 
-[Unreleased]: https://github.com/JWalen/VAGScanner/compare/v1.7.0...HEAD
+[Unreleased]: https://github.com/JWalen/VAGScanner/compare/v1.8.0...HEAD
+[1.8.0]: https://github.com/JWalen/VAGScanner/releases/tag/v1.8.0
 [1.7.0]: https://github.com/JWalen/VAGScanner/releases/tag/v1.7.0
 [1.6.0]: https://github.com/JWalen/VAGScanner/releases/tag/v1.6.0
 [1.5.1]: https://github.com/JWalen/VAGScanner/releases/tag/v1.5.1

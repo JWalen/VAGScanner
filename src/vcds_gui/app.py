@@ -795,6 +795,20 @@ if _HAVE_QT:
             cb.addWidget(self.conn_status, 1)
             outer.addWidget(conn_box)
 
+            # Live alert HUD — flashes red when a threshold rule is breached.
+            self.alert_banner = QtWidgets.QLabel("")
+            self.alert_banner.setAlignment(QtCore.Qt.AlignCenter)
+            self.alert_banner.setStyleSheet(
+                "background:#E10600; color:white; font-weight:bold; font-size:12pt;"
+                " border-radius:6px; padding:6px;")
+            self.alert_banner.hide()
+            outer.addWidget(self.alert_banner)
+            self._alert_active = set()
+            self._alert_flash = False
+            self._alert_timer = QtCore.QTimer(self)
+            self._alert_timer.setInterval(450)
+            self._alert_timer.timeout.connect(self._flash_alert)
+
             split = QtWidgets.QSplitter(QtCore.Qt.Horizontal)
             outer.addWidget(split, 1)
 
@@ -918,6 +932,10 @@ if _HAVE_QT:
             self.btn_gauges = QtWidgets.QPushButton("📊 Gauges")
             self.btn_gauges.setToolTip("Open a live gauge dashboard for the selected PIDs")
             run_bar.addWidget(self.btn_gauges)
+            self.chk_alert = QtWidgets.QCheckBox("🔔 Alerts")
+            self.chk_alert.setChecked(True)
+            self.chk_alert.setToolTip("Flash and beep when a threshold rule is breached live")
+            run_bar.addWidget(self.chk_alert)
             self.btn_start = QtWidgets.QPushButton("Start Logging")
             self.btn_stop = QtWidgets.QPushButton("Stop")
             self.btn_stop.setEnabled(False)
@@ -1270,11 +1288,57 @@ if _HAVE_QT:
             self._gauges.set_thresholds(self.trigger_rules)
             self._gauges.show()
 
+        _ALERT_OPS = {
+            ">": lambda a, b: a > b, "<": lambda a, b: a < b,
+            ">=": lambda a, b: a >= b, "<=": lambda a, b: a <= b,
+            "==": lambda a, b: a == b,
+        }
+
+        def _eval_alerts(self, values):
+            tripped = []
+            for r in self.trigger_rules:
+                v = values.get(r["channel"])
+                op = self._ALERT_OPS.get(r["op"])
+                if v is not None and op and op(v, r["value"]):
+                    tripped.append(f"{r['channel']} {r['op']} {r['value']:g} (now {v:g})")
+            return tripped
+
+        def _flash_alert(self):
+            self._alert_flash = not self._alert_flash
+            shade = "#E10600" if self._alert_flash else "#8A0400"
+            self.alert_banner.setStyleSheet(
+                f"background:{shade}; color:white; font-weight:bold; font-size:12pt;"
+                " border-radius:6px; padding:6px;")
+
+        def _update_alerts(self, values):
+            if not self.chk_alert.isChecked():
+                if self._alert_active:
+                    self._clear_alerts()
+                return
+            tripped = self._eval_alerts(values)
+            keys = {t.split(" (now")[0] for t in tripped}
+            if tripped:
+                self.alert_banner.setText("⚠  " + "    ·    ".join(tripped))
+                self.alert_banner.show()
+                if not self._alert_timer.isActive():
+                    self._alert_timer.start()
+                if keys - self._alert_active:  # a newly-tripped rule → beep
+                    QtWidgets.QApplication.beep()
+                self._alert_active = keys
+            elif self._alert_active:
+                self._clear_alerts()
+
+        def _clear_alerts(self):
+            self._alert_active = set()
+            self._alert_timer.stop()
+            self.alert_banner.hide()
+
         @QtCore.Slot(float, dict, str)
         def _on_sample(self, t, values, marker):
             self.plot.append_sample(t, values)
             if self._gauges is not None and self._gauges.isVisible():
                 self._gauges.update_values(values)
+            self._update_alerts(values)
             if marker:
                 self.run_status.setText(f"Logging… (event at t={t:.1f}s)")
 
@@ -1282,6 +1346,7 @@ if _HAVE_QT:
         def _on_finished(self, result):
             self.btn_start.setEnabled(True)
             self.btn_stop.setEnabled(False)
+            self._clear_alerts()
             self.run_status.setText(
                 f"Saved {os.path.basename(result.session_file)} ({result.sample_count} samples)."
             )
@@ -1311,6 +1376,7 @@ if _HAVE_QT:
         def _on_failed(self, msg):
             self.btn_start.setEnabled(True)
             self.btn_stop.setEnabled(False)
+            self._clear_alerts()
             self.run_status.setText(f"Error: {msg}")
 
         def _open_capture(self, item: "QtWidgets.QListWidgetItem"):

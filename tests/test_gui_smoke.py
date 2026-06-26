@@ -111,6 +111,19 @@ def test_logs_dir_is_not_rosstech(monkeypatch):
     assert gui_app._default_logs_dir() == "X:/custom-logs"
 
 
+def test_live_alert_hud(qapp):
+    win = gui_app.MainWindow()
+    lt = win.live_tab
+    lt.trigger_rules = [{"channel": "Coolant Temp", "op": ">", "value": 110.0}]
+    lt.chk_alert.setChecked(True)
+    lt._update_alerts({"Coolant Temp": 120.0})  # breach
+    assert not lt.alert_banner.isHidden() and "Coolant Temp" in lt.alert_banner.text()
+    assert lt._alert_active
+    lt._update_alerts({"Coolant Temp": 95.0})   # back to normal
+    assert lt.alert_banner.isHidden() and not lt._alert_active
+    win.close()
+
+
 def test_wifi_button_sets_socket_port(qapp, monkeypatch):
     win = gui_app.MainWindow()
     lt = win.live_tab
