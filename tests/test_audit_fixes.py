@@ -145,6 +145,41 @@ def test_clear_dtcs_null_reply_is_failure():
     assert live.PyOBDConnection(conn=_Conn(False), obd_module=_Obd, is_async=False).clear_dtcs() is True
 
 
+def test_garage_load_tolerates_unknown_field_and_corrupt(tmp_path):
+    import json
+    import os
+
+    from vcds_core import garage
+
+    p = str(tmp_path / "g.json")
+    garage.save_garage(p, [garage.Vehicle(vin="WAUZZZ8K9BA123456", make="Audi")])
+    assert not os.path.exists(p + ".tmp")  # atomic write cleaned up
+
+    # An unknown/newer-schema field must not wipe the record.
+    data = json.load(open(p, encoding="utf-8"))
+    data[0]["future_field"] = "x"
+    json.dump(data, open(p, "w", encoding="utf-8"))
+    v = garage.load_garage(p)
+    assert len(v) == 1 and v[0].make == "Audi"
+
+    # A corrupt file is moved aside (not silently treated as empty-then-overwritten).
+    open(p, "w", encoding="utf-8").write("{ this is not json")
+    assert garage.load_garage(p) == []
+    assert os.path.isfile(p + ".corrupt")
+
+
+def test_read_capped_rejects_oversized_file(tmp_path):
+    import pytest
+
+    from vcds_core import parse
+
+    p = tmp_path / "x.csv"
+    p.write_text("a" * 500, encoding="utf-8")
+    with pytest.raises(ValueError, match="too large"):
+        parse._read_capped(str(p), max_bytes=100)
+    assert parse._read_capped(str(p), max_bytes=1000)  # under the cap is fine
+
+
 def test_raw_connection_serializes_concurrent_transactions():
     # The single serial handle must not be written to by two threads at once.
     import threading

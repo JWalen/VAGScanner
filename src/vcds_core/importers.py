@@ -24,6 +24,7 @@ from .parse import (
     _downsample,
     _fill_stats,
     _is_numeric_row,
+    _read_capped,
     _split_rows,
     _to_float,
 )
@@ -58,8 +59,7 @@ def _parse_ts(s: str) -> Optional[float]:
 
 def import_generic_csv(path: str, max_points: int = 2000) -> MeasuringLog:
     """Import a generic OBD app CSV (Torque / OBD Fusion / FORScan / similar)."""
-    with open(path, "rb") as fh:
-        text = _decode(fh.read())
+    text = _decode(_read_capped(path))
     rows = _split_rows(text, _detect_delimiter(text.splitlines()[:25]))
     delim = _detect_delimiter(text.splitlines()[:25])
 

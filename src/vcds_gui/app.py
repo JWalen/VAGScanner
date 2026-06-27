@@ -1857,9 +1857,15 @@ if _HAVE_QT:
             self.btn_stop.setEnabled(False)
             self._clear_alerts()
             self._resume_livedata()
-            self.run_status.setText(
-                f"Saved {os.path.basename(result.session_file)} ({result.sample_count} samples)."
-            )
+            base = os.path.basename(result.session_file)
+            if getattr(result, "error", None):
+                self.run_status.setText(
+                    f"⚠ Saved {base} ({result.sample_count} samples) — recording ended "
+                    f"early: {result.error}. Partial log saved.")
+            else:
+                self.run_status.setText(
+                    f"Saved {base} ({result.sample_count} samples)."
+                )
             # Record the session under the active garage vehicle, if any.
             active = self.main.settings.value("garage/active_vin", "", type=str)
             if active:
@@ -3081,10 +3087,13 @@ if _HAVE_QT:
                 self._update_model_label()
 
         def _ensure_ai_consent(self) -> bool:
-            """One-time consent before sending any car data to a third-party AI."""
-            if self.settings.value("ai/consent", False, type=bool):
-                return True
+            """Consent before sending car data to a third-party AI — scoped PER
+            provider, so switching providers re-prompts (each is a different
+            company receiving your data)."""
             pid = self.settings.value("ai/provider", "anthropic", type=str)
+            # Honour the legacy global flag for whoever was already consented.
+            if self.settings.value(f"ai/consent/{pid}", False, type=bool):
+                return True
             prov = ai.PROVIDERS.get(pid)
             name = prov.label if prov else pid
             box = QtWidgets.QMessageBox(self)
@@ -3094,12 +3103,12 @@ if _HAVE_QT:
                 f"Your messages — and any context you include (a diagnosis of the open "
                 f"scan/log, and, when you ask, your stored logs or live-car data such as VIN "
                 f"and DTCs) — are sent over the internet to {name} to generate a reply.\n\n"
-                f"Don't include anything you don't want shared with a third party. This is "
-                f"asked once; you can clear it later by resetting the app.\n\nProceed?")
+                f"Don't include anything you don't want shared with a third party. You'll be "
+                f"asked again if you switch to a different provider.\n\nProceed?")
             box.setStandardButtons(QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
             box.setDefaultButton(QtWidgets.QMessageBox.No)
             if box.exec() == QtWidgets.QMessageBox.Yes:
-                self.settings.setValue("ai/consent", True)
+                self.settings.setValue(f"ai/consent/{pid}", True)
                 return True
             return False
 
@@ -4514,8 +4523,20 @@ if _HAVE_QT:
             if ok != QtWidgets.QMessageBox.Yes:
                 return
             relaunch = sys.executable if getattr(sys, "frozen", False) else None
+            # Only do the unattended /VERYSILENT install when the download was
+            # integrity-verified (SHA-256). If GitHub published no digest, run the
+            # installer VISIBLY so the user is a human gate — never silently
+            # execute an unverified binary.
+            verified = bool(getattr(self._update_info, "sha256", None))
+            if not verified:
+                QtWidgets.QMessageBox.warning(
+                    self, "Could not verify download",
+                    "This update could not be integrity-verified (no checksum was "
+                    "published for it), so the installer will run visibly for you to "
+                    "confirm — it won't be installed automatically.")
             try:
-                updater.launch_installer(path, silent=True, relaunch=relaunch)
+                updater.launch_installer(path, silent=verified,
+                                         relaunch=relaunch if verified else None)
             except Exception as exc:  # noqa: BLE001
                 QtWidgets.QMessageBox.critical(self, "Launch failed", str(exc))
                 return
@@ -4652,18 +4673,33 @@ def _export_clip(mlog: "parse.MeasuringLog", path: str, xmin: float, xmax: float
     Channels keep their own values; rows are indexed against the longest series'
     time axis (the common case of a single shared time axis exports exactly).
     """
+    import bisect
+
     # choose the channel with the most samples as the time reference
     ref_name = max(mlog.raw_series, key=lambda n: len(mlog.raw_series[n]["time"]))
     ref_t = mlog.raw_series[ref_name]["time"]
     channels = [live.LiveChannel(c.name, c.unit) for c in mlog.channels]
+    # Per-channel (time, value) — look up each value at the reference TIME, not by
+    # row index (channels drop missing rows independently, so indices misalign).
+    col = [(c.name, mlog.raw_series[c.name]["time"], mlog.raw_series[c.name]["value"])
+           for c in mlog.channels]
     rows: List[Tuple[str, float, Dict[str, Optional[float]]]] = []
-    for i, t in enumerate(ref_t):
+    for t in ref_t:
         if t < xmin or t > xmax:
             continue
         values: Dict[str, Optional[float]] = {}
-        for c in mlog.channels:
-            vals = mlog.raw_series[c.name]["value"]
-            values[c.name] = vals[i] if i < len(vals) else None
+        for name, ct, cv in col:
+            v = None
+            if ct:
+                j = bisect.bisect_left(ct, t)
+                best = bd = None
+                for k in (j - 1, j):
+                    if 0 <= k < len(ct):
+                        d = abs(ct[k] - t)
+                        if bd is None or d < bd:
+                            bd, best = d, cv[k]
+                v = best
+            values[name] = v
         rows.append(("", t, values))
     live.write_measuring_csv(path, channels, rows)
     return len(rows)

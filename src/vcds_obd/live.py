@@ -478,10 +478,26 @@ class LiveLogger:
 
         # finalize an in-progress capture (session ended before buffer_after elapsed)
         if cap_rows is not None and cap_info is not None:
-            write_measuring_csv(cap_info.file, self.channels, cap_rows, self.header_lines)
-            captures.append(cap_info)
+            try:
+                write_measuring_csv(cap_info.file, self.channels, cap_rows, self.header_lines)
+                captures.append(cap_info)
+            except OSError as exc:  # a capture-write fault must not lose the session
+                run_error = run_error or f"capture write failed: {exc}"
 
-        write_measuring_csv(session_path, self.channels, all_rows, self.header_lines)
+        # Persist the session; if the destination is unwritable, salvage to a temp
+        # file rather than discarding the whole buffered recording.
+        try:
+            write_measuring_csv(session_path, self.channels, all_rows, self.header_lines)
+        except OSError as exc:
+            import tempfile
+            salvage = os.path.join(tempfile.gettempdir(), os.path.basename(session_path))
+            try:
+                write_measuring_csv(salvage, self.channels, all_rows, self.header_lines)
+                session_path = salvage
+                run_error = run_error or f"could not write to logs folder ({exc}); saved to temp"
+            except OSError as exc2:
+                run_error = run_error or f"could not save recording: {exc2}"
+
         final_dtcs = self._safe_dtcs()
         duration = all_rows[-1][1] if all_rows else 0.0
         return SessionResult(

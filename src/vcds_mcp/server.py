@@ -60,10 +60,16 @@ def _safe_path(filename: str) -> str:
     """
     if not filename or os.path.isabs(filename) or ".." in filename.replace("\\", "/").split("/"):
         raise ValueError(f"Illegal filename: {filename!r}")
-    base = logs_dir()
-    full = os.path.abspath(os.path.join(base, filename))
+    # realpath (not abspath) so a symlink/junction inside the folder can't point out.
+    base = os.path.realpath(logs_dir())
+    full = os.path.realpath(os.path.join(base, filename))
     # Containment check that also handles case-insensitive Windows paths.
-    if os.path.commonpath([os.path.normcase(full), os.path.normcase(base)]) != os.path.normcase(base):
+    try:
+        contained = os.path.commonpath([os.path.normcase(full), os.path.normcase(base)]) \
+            == os.path.normcase(base)
+    except ValueError:  # different drives -> commonpath raises
+        contained = False
+    if not contained:
         raise ValueError(f"Path escapes logs directory: {filename!r}")
     if not os.path.isfile(full):
         raise ValueError(f"File not found in logs directory: {filename!r}")

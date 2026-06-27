@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.29.0] - 2026-06-27
+
+### Fixed (audit round 4 — failure modes & error handling)
+- **Garage data-loss prevention.** Saving the garage is now **atomic** (write-temp
+  + replace), so a full disk / crash mid-save can't truncate it; loading now
+  tolerates an unknown/newer field per record and **moves a corrupt file aside**
+  instead of silently treating the garage as empty (and overwriting it).
+- **CSV export aligns by time**, not row index — exported clips no longer pair the
+  time with the wrong sample of channels that have gaps.
+- **A recording that ends early now says so.** A mid-session adapter drop is shown
+  as "ended early — partial log saved" instead of a plain "Saved".
+- **Saving a recording is crash-safe** — if the logs folder is unwritable, the
+  recording is salvaged to a temp file rather than lost.
+
+### Security
+- **Updater won't silently install an unverified download.** If no checksum was
+  published, the installer runs **visibly** (human gate) instead of `/VERYSILENT`.
+- **AI consent is now per-provider** — switching providers re-prompts before any
+  car data goes to a different company.
+- **Tightened the AI/MCP file sandbox** to resolve symlinks (`realpath`) so a link
+  inside the logs folder can't read outside it; added a **file-size cap** on log
+  parsing to prevent a huge-file denial of service.
+
 ## [1.28.0] - 2026-06-27
 
 ### Fixed (audit round 3 — concurrency & performance)
@@ -721,7 +744,8 @@ First public release.
   installer, and publishes a GitHub Release on each `v*` tag.
 - 54-test pytest suite (no hardware; the live path is mocked).
 
-[Unreleased]: https://github.com/JWalen/OBD-Toolkit/compare/v1.28.0...HEAD
+[Unreleased]: https://github.com/JWalen/OBD-Toolkit/compare/v1.29.0...HEAD
+[1.29.0]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v1.29.0
 [1.28.0]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v1.28.0
 [1.27.0]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v1.27.0
 [1.26.0]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v1.26.0

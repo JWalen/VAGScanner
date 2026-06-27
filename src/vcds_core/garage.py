@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import json
 import os
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, fields
 from typing import List, Optional
 
 
@@ -40,19 +40,42 @@ class Vehicle:
 
 def load_garage(path: str) -> List[Vehicle]:
     if not path or not os.path.isfile(path):
-        return []
+        return []  # genuinely missing — empty garage
     try:
         with open(path, encoding="utf-8") as fh:
             data = json.load(fh)
-        return [Vehicle(**d) for d in data]
-    except Exception:  # noqa: BLE001
+    except OSError:
+        return []  # transient (locked / permission) — don't touch the file
+    except ValueError:
+        # File present but corrupt JSON. Move it aside so the next save can't
+        # silently overwrite it, rather than pretending the garage is empty.
+        try:
+            os.replace(path, path + ".corrupt")
+        except OSError:
+            pass
         return []
+    known = {f.name for f in fields(Vehicle)}
+    out: List[Vehicle] = []
+    for d in (data or []):
+        if not isinstance(d, dict):
+            continue
+        try:  # tolerate a single bad/newer-schema record without losing the rest
+            out.append(Vehicle(**{k: v for k, v in d.items() if k in known}))
+        except Exception:  # noqa: BLE001
+            continue
+    return out
 
 
 def save_garage(path: str, vehicles: List[Vehicle]) -> None:
+    # Atomic write: a failure mid-dump leaves the existing garage intact instead
+    # of truncating it to a partial/corrupt file.
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
-    with open(path, "w", encoding="utf-8") as fh:
+    tmp = f"{path}.tmp"
+    with open(tmp, "w", encoding="utf-8") as fh:
         json.dump([asdict(v) for v in vehicles], fh, indent=2)
+        fh.flush()
+        os.fsync(fh.fileno())
+    os.replace(tmp, path)
 
 
 def find(vehicles: List[Vehicle], vin: str) -> Optional[Vehicle]:

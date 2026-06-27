@@ -229,6 +229,18 @@ def _is_group_meta_cell(cell: str) -> bool:
 # --------------------------------------------------------------------------- #
 
 
+MAX_FILE_BYTES = 64 * 1024 * 1024  # cap a single log/scan file at 64 MB
+
+
+def _read_capped(path: str, max_bytes: int = MAX_FILE_BYTES) -> bytes:
+    """Read a file but refuse pathologically large ones (DoS guard)."""
+    with open(path, "rb") as fh:
+        data = fh.read(max_bytes + 1)
+    if len(data) > max_bytes:
+        raise ValueError(f"File too large (>{max_bytes // (1024 * 1024)} MB): {path}")
+    return data
+
+
 def parse_measuring_log(path: str, max_points: int = 2000) -> MeasuringLog:
     """Parse a VCDS measuring-value CSV (or any file in the same flat layout).
 
@@ -236,9 +248,7 @@ def parse_measuring_log(path: str, max_points: int = 2000) -> MeasuringLog:
         path: Path to the .CSV file.
         max_points: Down-sample each returned series to roughly this many points.
     """
-    with open(path, "rb") as fh:
-        raw = fh.read()
-    text = _decode(raw)
+    text = _decode(_read_capped(path))
 
     sample_lines = text.splitlines()[:25]
     delimiter = _detect_delimiter(sample_lines)
@@ -543,8 +553,7 @@ def parse_autoscan(path: str) -> AutoScan:
     The format is stable, but indentation — not regex alone — is what separates
     a fault line from the status-detail line indented beneath it.
     """
-    with open(path, "rb") as fh:
-        text = _decode(fh.read())
+    text = _decode(_read_capped(path))
     lines = text.splitlines()
 
     vin: Optional[str] = None

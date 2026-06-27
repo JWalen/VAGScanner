@@ -108,19 +108,27 @@ def test_ai_multi_chat(qapp, tmp_path, monkeypatch):
 def test_ai_consent_gate(qapp, monkeypatch):
     win = gui_app.MainWindow()
     tab = win.ai_tab
-    tab.settings.setValue("ai/consent", False)
+    pid = tab.settings.value("ai/provider", "anthropic", type=str)
+    key = f"ai/consent/{pid}"
+    tab.settings.setValue(key, False)
     # Decline -> no consent recorded, send blocked
     monkeypatch.setattr(gui_app.QtWidgets.QMessageBox, "exec",
                         lambda self: gui_app.QtWidgets.QMessageBox.No)
     assert tab._ensure_ai_consent() is False
-    assert tab.settings.value("ai/consent", False, type=bool) is False
-    # Accept -> consent recorded, and subsequent calls don't re-prompt
+    assert tab.settings.value(key, False, type=bool) is False
+    # Accept -> consent recorded (per provider), and subsequent calls don't re-prompt
     monkeypatch.setattr(gui_app.QtWidgets.QMessageBox, "exec",
                         lambda self: gui_app.QtWidgets.QMessageBox.Yes)
     assert tab._ensure_ai_consent() is True
-    assert tab.settings.value("ai/consent", False, type=bool) is True
+    assert tab.settings.value(key, False, type=bool) is True
     assert tab._ensure_ai_consent() is True  # no dialog needed now
-    tab.settings.setValue("ai/consent", False)  # cleanup
+    # A different provider must re-prompt (consent is per-provider)
+    tab.settings.setValue("ai/provider", "openai")
+    tab.settings.setValue("ai/consent/openai", False)
+    assert tab._ensure_ai_consent() is True  # exec still returns Yes here
+    tab.settings.setValue(key, False)  # cleanup
+    tab.settings.setValue("ai/consent/openai", False)
+    tab.settings.setValue("ai/provider", pid)
     win.close()
 
 

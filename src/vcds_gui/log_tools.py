@@ -81,9 +81,14 @@ def make_executor(logs_dir: str, profile: str = "generic", conn_getter=None):
         if (not filename or os.path.isabs(filename)
                 or ".." in filename.replace("\\", "/").split("/")):
             raise ValueError(f"Illegal filename: {filename!r}")
-        base = os.path.abspath(logs_dir)
-        full = os.path.abspath(os.path.join(base, filename))
-        if os.path.commonpath([os.path.normcase(full), os.path.normcase(base)]) != os.path.normcase(base):
+        base = os.path.realpath(logs_dir)  # resolve symlinks so they can't escape
+        full = os.path.realpath(os.path.join(base, filename))
+        try:
+            contained = os.path.commonpath(
+                [os.path.normcase(full), os.path.normcase(base)]) == os.path.normcase(base)
+        except ValueError:
+            contained = False
+        if not contained:
             raise ValueError("Path escapes the logs folder.")
         if not os.path.isfile(full):
             raise ValueError(f"File not found: {filename!r}")
