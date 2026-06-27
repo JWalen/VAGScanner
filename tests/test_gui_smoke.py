@@ -293,6 +293,28 @@ def test_shutdown_cleans_up(qapp):
     win.close()  # MainWindow.closeEvent delegates to _shutdown without crashing
 
 
+def test_onboarding_uses_sidebar_terms_not_tabs():
+    joined = "".join(t + b for t, b in gui_app.TOUR_PAGES) + gui_app.HELP_HTML
+    assert "Tab 1" not in joined and "Tab 2" not in joined
+    assert "Dashboard" in joined and "AI Assistant" in joined
+    assert "OBD Toolkit" in joined and "VCDS Toolkit" not in joined
+
+
+def test_gauge_low_side_threshold_colors_red(qapp):
+    from vcds_obd import live
+    chans = live.build_channels({"RPM"})
+    g = gui_app.GaugeWindow(chans, gui_app.units.AS_LOGGED)
+    name = next(iter(g.gauges))
+    g.set_thresholds([{"channel": name, "op": "<", "value": 10.0}])
+    gauge = g.gauges[name]
+    assert gauge.crit_lo == 10.0          # low-side rule honored (was ignored)
+    gauge.set_value(5.0)
+    assert gauge._color().name().lower() == "#e53e3e"   # breach -> red
+    gauge.set_value(50.0)
+    assert gauge._color().name().lower() != "#e53e3e"
+    g.close()
+
+
 def test_live_tab_has_livedata_button(qapp):
     win = gui_app.MainWindow()
     assert win.live_tab.btn_livedata is not None

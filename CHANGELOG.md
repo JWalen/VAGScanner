@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.31.0] - 2026-06-27
+
+### Fixed (audit round 6 — UX, accessibility & onboarding)
+- **Onboarding rewritten for the current UI.** The first-run tour, the F1 User
+  Guide and the in-app text described an old "Tab 1 / Tab 2" layout that no longer
+  exists — they now describe the **sidebar** (Dashboard / Files / Live / AI
+  Assistant / Garage / Settings) and the brand name is consistent ("OBD Toolkit").
+- **Gauges read correctly in Metric/Imperial.** The needle/bar fill was computed
+  from the raw value against a raw-unit range while the number was converted, so
+  the dial disagreed with its own readout — now both use the same converted system.
+- **Gauges honor low-side alarms.** Rules like "oil pressure < 1.0" or "voltage <
+  11.5" now turn the gauge red (they were silently ignored), matching the alert
+  banner.
+- **Clearer connect feedback.** When the adapter opens but there's no OBD-II link
+  (ignition off / wrong protocol), you get an actionable message instead of a green
+  "Connected (0 PIDs)".
+- **Capture-trigger input is validated** with a message (empty channel / non-numeric
+  value) instead of silently doing nothing.
+
+### Added
+- **Keyboard shortcuts** Ctrl+1–4 to switch between Dashboard / Files / Live / AI
+  (shown in the sidebar tooltips) — improves keyboard accessibility.
+
 ## [1.30.0] - 2026-06-27
 
 ### Security / CI (audit round 5 — pipeline & supply chain)
@@ -764,7 +787,8 @@ First public release.
   installer, and publishes a GitHub Release on each `v*` tag.
 - 54-test pytest suite (no hardware; the live path is mocked).
 
-[Unreleased]: https://github.com/JWalen/OBD-Toolkit/compare/v1.30.0...HEAD
+[Unreleased]: https://github.com/JWalen/OBD-Toolkit/compare/v1.31.0...HEAD
+[1.31.0]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v1.31.0
 [1.30.0]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v1.30.0
 [1.29.0]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v1.29.0
 [1.28.0]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v1.28.0

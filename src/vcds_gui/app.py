@@ -1,12 +1,14 @@
-"""Desktop GUI for the VCDS toolkit (PySide6 + pyqtgraph).
+"""Desktop GUI for OBD Toolkit (PySide6 + pyqtgraph).
 
-Two tabs share ONE plotting widget:
+A left sidebar switches between pages (plus Garage & Settings launchers):
 
-  * Tab 1 — File Analyzer: open a measuring CSV (+ optional Auto-Scan), toggle
-    channels, run event detection, and export a clipped CSV of the current view.
-  * Tab 2 — Live (OBD-II): connect to an ELM327, pick supported PIDs, watch a
-    live plot, read/clear DTCs, configure event-capture triggers and log a
-    session that is immediately analyzable in Tab 1.
+  * Dashboard: recent logs, the active vehicle, quick actions.
+  * Files: open a measuring CSV (+ optional Auto-Scan), toggle channels, run
+    diagnosis/event detection, and export a clipped CSV of the current view.
+  * Live (OBD-II): connect to an ELM327, pick supported PIDs, watch a live plot,
+    read/clear DTCs, configure event-capture triggers and log a session that is
+    immediately analyzable on the Files page.
+  * AI Assistant: chat that can read your logs and the connected car.
 
 Multi-scale UX choice
 ---------------------
@@ -1370,12 +1372,20 @@ if _HAVE_QT:
             self.pid_search.clear()
             self._filter_pids("")
             self._update_pid_count()
+            self._set_connected(True)
+            if not supported:
+                # Port opened but no OBD-II link negotiated — give an actionable hint
+                # instead of a green "Connected (0 PIDs)" dead end.
+                self.conn_status.setText(
+                    "<span style='color:#DD6B20'>Adapter found, but no OBD-II link</span> — "
+                    "turn the ignition to ON/RUN, check the cable/adapter, or pick a "
+                    "specific baud and reconnect.")
+                return
             mode = " · ⚡ smooth" if getattr(self.conn, "is_async", False) else ""
             self.conn_status.setText(
                 f"<span style='color:#38A169'>Connected</span> — {self.conn.protocol()} "
                 f"({len(supported)} PIDs){mode} · identifying vehicle…"
             )
-            self._set_connected(True)
             self._start_identify()
 
         @staticmethod
@@ -1587,11 +1597,13 @@ if _HAVE_QT:
         # -- triggers ------------------------------------------------------- #
         def _add_trigger_rule(self):
             chan = self.trig_chan.text().strip()
+            if not chan:
+                QtWidgets.QMessageBox.warning(self, "Trigger", "Channel is required.")
+                return
             try:
                 val = float(self.trig_val.text().strip())
             except ValueError:
-                return
-            if not chan:
+                QtWidgets.QMessageBox.warning(self, "Trigger", "Value must be numeric.")
                 return
             self.trigger_rules.append({"channel": chan, "op": self.trig_op.currentText(), "value": val})
             self.trig_label.setText(
@@ -1929,9 +1941,11 @@ if _HAVE_QT:
     """
 
     HELP_HTML = """
-    <h2>VCDS Toolkit — User Guide</h2>
-    <p>Analyze VCDS logs and capture live OBD-II data from a VAG/Audi car.
-    There are two tabs that share one plot.</p>
+    <h2>OBD Toolkit — User Guide</h2>
+    <p>Analyze VCDS logs and capture live OBD-II data from your car. Use the
+    <b>sidebar</b> to move between <b>Dashboard</b>, <b>Files</b>, <b>Live</b> and
+    the <b>AI Assistant</b>, plus the <b>Garage</b> and <b>Settings</b>
+    (<b>Ctrl+1–4</b> switch the main pages).</p>
 
     <h3>What it does &mdash; and does not</h3>
     <ul>
@@ -1947,7 +1961,7 @@ if _HAVE_QT:
 
     <h3>Getting a log file out of VCDS</h3>
     """ + VCDS_LOG_HTML + """
-    <h3>Tab 1 &mdash; File Analyzer</h3>
+    <h3>Files &mdash; analyze logs</h3>
     <ol>
       <li><b>Open Measuring CSV…</b> loads a log; its channels appear in the left
           list. Tick/untick a channel to show or hide its trace (the colour
@@ -1963,7 +1977,7 @@ if _HAVE_QT:
       <li><b>Export View…</b> writes the samples currently in view to a new CSV.</li>
     </ol>
 
-    <h3>Tab 2 &mdash; Live (OBD-II)</h3>
+    <h3>Live (OBD-II)</h3>
     <ol>
       <li><b>Scan Ports</b>, pick your adapter's port (or type it), choose a baud
           (Auto, or 38400 / 9600 / 115200 for clones), then <b>Connect</b>.
@@ -1978,7 +1992,7 @@ if _HAVE_QT:
           clipped capture (with context from <i>before</i> the trigger) is saved.</li>
       <li><b>Start Logging</b> / <b>Stop</b>. On stop, the session CSV is saved to
           your logs folder. Captured events appear at the lower left &mdash;
-          double-click one to open it in the File Analyzer tab.</li>
+          double-click one to open it on the <b>Files</b> page.</li>
     </ol>
 
     <h3>The plot</h3>
@@ -2006,7 +2020,7 @@ if _HAVE_QT:
     class HelpDialog(QtWidgets.QDialog):
         def __init__(self, version: str, parent=None):
             super().__init__(parent)
-            self.setWindowTitle("VCDS Toolkit — User Guide")
+            self.setWindowTitle("OBD Toolkit — User Guide")
             self.resize(760, 680)
             layout = QtWidgets.QVBoxLayout(self)
             browser = QtWidgets.QTextBrowser()
@@ -2330,8 +2344,8 @@ if _HAVE_QT:
     # First-run quick tour pages: (title, html body).
     TOUR_PAGES = [
         (
-            "Welcome to VCDS Toolkit 👋",
-            "<p>Analyze VCDS logs and capture live OBD-II data from your VAG/Audi.</p>"
+            "Welcome to OBD Toolkit 👋",
+            "<p>Analyze VCDS logs and capture live OBD-II data from your car.</p>"
             "<p>Two things to know up front:</p>"
             "<ul>"
             "<li>It <b>reads the files VCDS writes</b> — it does not control VCDS "
@@ -2339,40 +2353,47 @@ if _HAVE_QT:
             "<li>Live data comes from a <b>generic ELM327</b> only, which sees the "
             "standard OBD-II PIDs (not VAG-specific channels).</li>"
             "</ul>"
-            "<p>This quick tour takes 20 seconds. You can reopen it any time from "
+            "<p>Navigate with the <b>sidebar on the left</b>: Dashboard, Files, Live, "
+            "AI Assistant, plus Garage &amp; Settings. Reopen this tour any time from "
             "<b>Help → Quick Tour</b>.</p>",
         ),
         (
-            "Tab 1 — File Analyzer 📈",
-            "<p>Open a measuring <b>CSV</b> (and optionally an <b>Auto-Scan</b>).</p>"
+            "Dashboard &amp; Files 📈",
+            "<p>The <b>Dashboard</b> is your home — recent logs, the active vehicle, "
+            "and quick actions.</p>"
+            "<p>Open the <b>Files</b> page to analyze a measuring <b>CSV</b> (and "
+            "optionally an <b>Auto-Scan</b>):</p>"
             "<ul>"
-            "<li>Tick channels on the left to show/hide their traces.</li>"
-            "<li><b>Find Events</b> highlights divergence, rising counters and "
-            "extremes; click an event to jump the cursor there.</li>"
-            "<li>Add <b>threshold rules</b> (e.g. <code>Boost &lt; 1700</code>) and "
-            "<b>Export View…</b> to clip the current window to a new CSV.</li>"
+            "<li>Tick channels on the left to show/hide their traces; toggle "
+            "<b>Graph / Data</b> to see the raw table.</li>"
+            "<li><b>Diagnose</b> and <b>Find Events</b> highlight faults, divergence "
+            "and extremes; click an event to jump the cursor there.</li>"
+            "<li><b>Export View…</b> clips the current window to a new CSV.</li>"
             "</ul>",
         ),
         (
-            "Tab 2 — Live (OBD-II) 🔌",
-            "<p>Plug in a generic ELM327 (USB preferred), <b>Scan Ports</b>, "
-            "<b>Connect</b>, then tick the PIDs to log.</p>"
+            "Live (OBD-II) 🔌",
+            "<p>Open the <b>Live</b> page, plug in a generic ELM327 (USB preferred), "
+            "<b>Scan Ports</b>, <b>Connect</b>, then tick the PIDs to log.</p>"
             "<ul>"
+            "<li>On connect it auto-identifies the car (VIN/engine) and adds it to "
+            "your <b>Garage</b>.</li>"
             "<li><b>Read / Clear DTCs</b> — clearing always asks first.</li>"
-            "<li>Set a <b>trigger</b> (threshold or any new DTC) to auto-save a "
-            "clipped capture around an intermittent fault.</li>"
-            "<li><b>Start / Stop Logging</b>; the session CSV is immediately "
-            "analyzable back in Tab 1.</li>"
+            "<li><b>Live Data</b> and <b>Gauges</b> stream the selected PIDs; "
+            "<b>Start / Stop Logging</b> saves a session CSV you can open in Files.</li>"
+            "<li>Turn on <b>Advanced mode</b> (Settings) for capture triggers, live "
+            "alerts, Enhanced PIDs and Resets.</li>"
             "</ul>",
         ),
         (
-            "Tips & help 💡",
+            "AI Assistant & tips 🤖",
             "<ul>"
-            "<li>Traces are <b>normalized</b> so different scales fit one axis; the "
-            "cursor still reads each channel's real value.</li>"
+            "<li>The <b>AI Assistant</b> page can read your logs and the connected "
+            "car to help diagnose — set a provider/key in <b>Settings</b> first.</li>"
+            "<li>The <b>Garage</b> keeps each car's history, maintenance and logs.</li>"
             "<li>Files live in the folder shown in the status bar "
             "(<code>VCDS_LOGS_DIR</code>).</li>"
-            "<li>Press <b>F1</b> any time for the full User Guide.</li>"
+            "<li>Press <b>F1</b> for the full User Guide; <b>Ctrl+1–4</b> switch pages.</li>"
             "</ul>"
             "<p>Have fun — and drive safely. 🏎️</p>",
         ),
@@ -2382,7 +2403,7 @@ if _HAVE_QT:
         def __init__(self, settings, show_startup_default: bool, parent=None):
             super().__init__(parent)
             self.settings = settings
-            self.setWindowTitle("Welcome to VCDS Toolkit")
+            self.setWindowTitle("Welcome to OBD Toolkit")
             self.resize(580, 440)
             v = QtWidgets.QVBoxLayout(self)
 
@@ -2637,7 +2658,8 @@ if _HAVE_QT:
             self.system = system
             self.value = None
             self.warn = None
-            self.crit = None
+            self.crit = None       # high-side critical bound
+            self.crit_lo = None    # low-side critical bound (e.g. oil pressure < x)
             self.setMinimumSize(190, 150)
             self.setFrameShape(QtWidgets.QFrame.StyledPanel)
             self.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
@@ -2652,6 +2674,8 @@ if _HAVE_QT:
                 return QtGui.QColor("#0066CC")
             if self.crit is not None and self.value >= self.crit:
                 return QtGui.QColor("#E53E3E")
+            if self.crit_lo is not None and self.value <= self.crit_lo:
+                return QtGui.QColor("#E53E3E")  # low-side breach (e.g. low oil pressure)
             if self.warn is not None and self.value >= self.warn:
                 return QtGui.QColor("#DD6B20")
             return QtGui.QColor("#0066CC")
@@ -2659,7 +2683,15 @@ if _HAVE_QT:
         def _frac(self):
             if self.value is None or self.vmax == self.vmin:
                 return None
-            return max(0.0, min(1.0, (self.value - self.vmin) / (self.vmax - self.vmin)))
+            # Convert value AND the range bounds into the display system so the
+            # needle/bar fill matches the converted number printed on the face
+            # (otherwise °C↔°F offset and unit scaling make them disagree).
+            v, _ = units.convert(self.value, self.unit, self.system)
+            lo, _ = units.convert(self.vmin, self.unit, self.system)
+            hi, _ = units.convert(self.vmax, self.unit, self.system)
+            if hi == lo:
+                return None
+            return max(0.0, min(1.0, (v - lo) / (hi - lo)))
 
         # -- customization -------------------------------------------------- #
         def _menu(self, pos):
@@ -2807,10 +2839,20 @@ if _HAVE_QT:
             for name, g in self.gauges.items():
                 g.warn = None
                 g.crit = None
+                g.crit_lo = None
                 for r in rules:
                     chan = str(r.get("channel", "")).lower()
-                    if chan and chan in name.lower() and r.get("op") in (">", ">="):
-                        g.crit = float(r.get("value"))
+                    if not (chan and chan in name.lower()):
+                        continue
+                    try:
+                        val = float(r.get("value"))
+                    except (TypeError, ValueError):
+                        continue
+                    op = r.get("op")
+                    if op in (">", ">="):
+                        g.crit = val
+                    elif op in ("<", "<="):
+                        g.crit_lo = val  # honor low-side rules like the alert banner
 
         def update_values(self, values):
             for name, g in self.gauges.items():
@@ -4138,9 +4180,16 @@ if _HAVE_QT:
             self.live_tab = LiveTab(self)
             self.ai_tab = AiAssistantTab(self)
             self._page_index = {}
-            for key, widget in (("dashboard", self.dashboard), ("files", self.analyzer),
-                                ("live", self.live_tab), ("ai", self.ai_tab)):
+            for n, (key, widget) in enumerate((("dashboard", self.dashboard),
+                                               ("files", self.analyzer),
+                                               ("live", self.live_tab),
+                                               ("ai", self.ai_tab)), start=1):
                 self._page_index[key] = self.stack.addWidget(widget)
+                # Ctrl+1..4 jump straight to a page (keyboard accessibility).
+                sc = QtGui.QShortcut(QtGui.QKeySequence(f"Ctrl+{n}"), self)
+                sc.activated.connect(lambda k=key: self.show_page(k))
+                if key in self._nav:
+                    self._nav[key].setToolTip(f"{self._nav[key].text()}  (Ctrl+{n})")
 
             self._build_menu()
             self.show_page("dashboard")
