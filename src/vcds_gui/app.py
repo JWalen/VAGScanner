@@ -1416,7 +1416,7 @@ if _HAVE_QT:
                 garage_mod.save_garage(path, vehicles)
                 self.main.settings.setValue("garage/active_vin", vin)
                 if dec and dec.brand_profile != "generic":
-                    self.main._set_profile(dec.brand_profile)
+                    self.main._set_profile(dec.brand_profile, persist=False)
 
             label = f"{dec.year} {dec.make}" if (dec and dec.make) else (f"VIN {vin}" if vin else "")
             base = self.conn_status.text().split(" · identifying")[0]
@@ -1554,7 +1554,7 @@ if _HAVE_QT:
             VehicleInfoDialog(vstr, info, cals, readiness, perm, self).exec()
             # Auto-select the brand profile from the VIN, and add to the garage.
             if info and info.brand_profile != "generic":
-                self.main._set_profile(info.brand_profile)
+                self.main._set_profile(info.brand_profile, persist=False)
             if vstr and info:
                 path = os.path.join(DEFAULT_LOGS_DIR, "garage.json")
                 vehicles = garage_mod.load_garage(path)
@@ -1766,10 +1766,21 @@ if _HAVE_QT:
         def _eval_alerts(self, values):
             tripped = []
             for r in self.trigger_rules:
-                v = values.get(r["channel"])
                 op = self._ALERT_OPS.get(r["op"])
-                if v is not None and op and op(v, r["value"]):
-                    tripped.append(f"{r['channel']} {r['op']} {r['value']:g} (now {v:g})")
+                if op is None:
+                    continue
+                chan_q = str(r.get("channel", "")).strip().lower()
+                # Substring match on channel name — same semantics as event
+                # capture and the gauges (the values dict is keyed by full names
+                # like "Boost (derived)", so an exact "Boost" lookup never fired).
+                for name, v in values.items():
+                    if v is None:
+                        continue
+                    if chan_q and chan_q not in name.lower():
+                        continue
+                    if op(v, r["value"]):
+                        tripped.append(f"{name} {r['op']} {r['value']:g} (now {v:g})")
+                        break
             return tripped
 
         def _flash_alert(self):
@@ -3279,6 +3290,8 @@ if _HAVE_QT:
             text = self.input.toPlainText().strip()
             if not text:
                 return
+            if self._thread is not None and self._thread.isRunning():
+                return  # a request is already in flight — ignore re-entrant send/Enter
             pid = self.settings.value("ai/provider", "anthropic", type=str)
             key = self.settings.value(f"ai/key/{pid}", "", type=str)
             if not key:
@@ -3296,6 +3309,7 @@ if _HAVE_QT:
                 f"ai/model/{pid}", prov.default_model if prov else "", type=str)
             if self.current is None:
                 self._new_chat()
+            self._inflight = self.current  # the chat this reply belongs to
             self.history.append({"role": "user", "content": text})
             if self.current.get("title") in (None, "", "New chat"):
                 self.current["title"] = text[:40] + ("…" if len(text) > 40 else "")
@@ -3308,8 +3322,7 @@ if _HAVE_QT:
             self._render()
             self._save_chats()
 
-            prof = profiles.get_profile(
-                self.settings.value("ui/profile", profiles.DEFAULT_PROFILE, type=str))
+            prof = profiles.get_profile(self.main.current_profile())
             system = ai.vehicle_system_prompt(self._build_context(), persona=prof.ai_persona)
 
             tools = executor = None
@@ -3344,7 +3357,8 @@ if _HAVE_QT:
         def _on_delta(self, chunk):
             self._pending = None
             self._stream_text += chunk
-            self._render()
+            if getattr(self, "_inflight", None) is self.current:
+                self._render()  # only paint if the user hasn't switched chats
 
         @QtCore.Slot(str)
         def _on_tool(self, name):
@@ -3355,20 +3369,33 @@ if _HAVE_QT:
         @QtCore.Slot(str)
         def _on_reply(self, reply):
             text = reply or self._stream_text
-            self.history.append({"role": "assistant", "content": text})
+            # Append to the chat the request was sent from, even if the user has
+            # since switched chats — otherwise the answer lands in the wrong one.
+            target = getattr(self, "_inflight", None) or self.current
+            target["messages"].append({"role": "assistant", "content": text})
+            self._inflight = None
             self._stream_text = ""
             self._pending = None
             self.btn_send.setEnabled(True)
             self._save_chats()
-            self._render()
+            if target is self.current:
+                self._render()
 
         @QtCore.Slot(str)
         def _on_error(self, msg):
+            self._inflight = None
             self._pending = None
             self._stream_text = ""
             self._error = msg
             self.btn_send.setEnabled(True)
             self._render()
+
+        def _shutdown(self):
+            """Stop an in-flight AI request so the app can close cleanly."""
+            t = getattr(self, "_thread", None)
+            if t is not None and t.isRunning():
+                t.quit()
+                t.wait(2000)
 
     class ResetsDialog(QtWidgets.QDialog):
         """Safe, standardized OBD-II write actions (and an honest note on the rest)."""
@@ -3525,7 +3552,7 @@ if _HAVE_QT:
                 return
             self.main.settings.setValue("garage/active_vin", veh.vin)
             if veh.brand_profile != "generic":
-                self.main._set_profile(veh.brand_profile)
+                self.main._set_profile(veh.brand_profile, persist=False)
             self.main.statusBar().showMessage(f"Active vehicle: {veh.label}", 4000)
             self._fill()
 
@@ -4229,12 +4256,24 @@ if _HAVE_QT:
                 b.setIcon(_svg_icon(k, muted))
 
         def closeEvent(self, event):
-            # Tear down live worker threads / pop-out windows so we don't get a
+            # Tear down every worker thread / pop-out window so we don't get a
             # "QThread destroyed while still running" crash on exit.
             try:
                 self.live_tab._shutdown()
             except Exception:  # noqa: BLE001
                 pass
+            try:
+                self.ai_tab._shutdown()
+            except Exception:  # noqa: BLE001
+                pass
+            for attr in ("_chk_thread", "_dl_thread"):
+                t = getattr(self, attr, None)
+                try:
+                    if t is not None and t.isRunning():
+                        t.quit()
+                        t.wait(2000)
+                except Exception:  # noqa: BLE001
+                    pass
             super().closeEvent(event)
 
         def show_page(self, key: str):
@@ -4270,8 +4309,12 @@ if _HAVE_QT:
             self.settings.setValue("ui/dark", on)
             self._apply_theme(on)
 
-        def _set_profile(self, pid: str):
-            self.settings.setValue("ui/profile", pid)
+        def _set_profile(self, pid: str, persist: bool = True):
+            # persist=False: apply for this session only (auto VIN-derived profile)
+            # without overwriting the user's chosen default profile.
+            if persist:
+                self.settings.setValue("ui/profile", pid)
+            self._active_profile = pid
             for a in self._profile_group.actions():
                 if a.data() == pid:
                     a.setChecked(True)
@@ -4287,7 +4330,10 @@ if _HAVE_QT:
             self.live_tab.plot.set_unit_system(system)
 
         def current_profile(self) -> str:
-            return self.settings.value("ui/profile", profiles.DEFAULT_PROFILE, type=str)
+            # The session-active profile (auto VIN-derived or manually chosen)
+            # falls back to the saved default.
+            return getattr(self, "_active_profile", None) or self.settings.value(
+                "ui/profile", profiles.DEFAULT_PROFILE, type=str)
 
         def show_mcp_install(self):
             McpInstallDialog(DEFAULT_LOGS_DIR, self).exec()

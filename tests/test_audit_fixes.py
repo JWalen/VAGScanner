@@ -67,6 +67,34 @@ def test_divergence_still_fires_on_matching_boost(tmp_path):
     assert any(f.title == "Actual value falls short of target" for f in report.findings)
 
 
+def test_find_events_survives_malformed_rule(tmp_path):
+    rows = ["TIME,Engine RPM", "s,/min"]
+    for k in range(5):
+        rows.append(f"{k * 0.5:.1f},{1000 + k * 300}")
+    p = tmp_path / "ev.csv"
+    p.write_text("\n".join(rows) + "\n", encoding="utf-8")
+    log = parse.parse_measuring_log(str(p))
+    # A rule missing 'value' (or non-numeric) must not crash find_events.
+    assert parse.find_events(log, [{"channel": "RPM", "op": ">"}]) == []
+    assert parse.find_events(log, [{"channel": "RPM", "op": ">", "value": "x"}]) == []
+    good = parse.find_events(log, [{"channel": "RPM", "op": ">", "value": 1500}])
+    assert isinstance(good, list)
+
+
+def test_fuel_economy_handles_misaligned_fuel_series(tmp_path):
+    # Speed has a gap (blank fuel cell) so speed & fuel rows differ in index;
+    # time-based lookup must still integrate fuel correctly (no IndexError/zero).
+    rows = ["TIME,Vehicle Speed,Fuel Rate", "s,km/h,L/h"]
+    for k in range(11):
+        fr = "" if k == 5 else "6"        # one missing fuel sample
+        rows.append(f"{k:.1f},100,{fr}")
+    p = tmp_path / "gap.csv"
+    p.write_text("\n".join(rows) + "\n", encoding="utf-8")
+    log = parse.parse_measuring_log(str(p))
+    econ = trip.fuel_economy(log)
+    assert econ is not None and econ.fuel_l > 0 and econ.l_per_100km is not None
+
+
 def test_openai_token_param_for_o_series():
     from vcds_gui.ai import _openai_token_param
     assert "max_completion_tokens" in _openai_token_param("o4-mini", 100)

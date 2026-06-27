@@ -214,6 +214,18 @@ def test_live_alert_hud(qapp):
     win.close()
 
 
+def test_live_alert_substring_channel_match(qapp):
+    # Regression: the banner used an exact key lookup, so a rule channel of
+    # "Boost" never fired against the "Boost (derived)" value key.
+    win = gui_app.MainWindow()
+    lt = win.live_tab
+    lt.trigger_rules = [{"channel": "Boost", "op": ">", "value": 100.0}]
+    lt.chk_alert.setChecked(True)
+    lt._update_alerts({"Boost (derived)": 150.0})  # substring match must trip
+    assert not lt.alert_banner.isHidden() and lt._alert_active
+    win.close()
+
+
 def test_connect_identify_creates_garage_vehicle(qapp, tmp_path, monkeypatch):
     from vcds_core import garage
     monkeypatch.setattr(gui_app, "DEFAULT_LOGS_DIR", str(tmp_path))

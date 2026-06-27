@@ -162,9 +162,20 @@ def _sse_events(url, headers, payload, opener, timeout):
                 if payload_str == "[DONE]":
                     break
                 try:
-                    yield json.loads(payload_str)
+                    obj = json.loads(payload_str)
                 except ValueError:
                     continue
+                # Providers report failures in-band after a 200 (rate limit,
+                # overload, token cap). Surface them instead of ending blank.
+                err = None
+                if isinstance(obj, dict):
+                    if obj.get("type") == "error":
+                        err = (obj.get("error") or {}).get("message") or "stream error"
+                    elif isinstance(obj.get("error"), dict):
+                        err = obj["error"].get("message") or "stream error"
+                if err:
+                    raise RuntimeError(f"Provider stream error: {err}")
+                yield obj
 
 
 def _anthropic(api_key, model, system, messages, max_tokens, timeout, opener,
@@ -314,7 +325,7 @@ def _anthropic_stream(api_key, model, system, messages, max_tokens, timeout, ope
             convo.append({"role": "user", "content": results})
             continue
         break
-    return "".join(all_text).strip()
+    return "".join(all_text).strip() or "(stopped after tool rounds)"
 
 
 def _openai_stream(api_key, model, system, messages, max_tokens, timeout, opener,
@@ -365,7 +376,7 @@ def _openai_stream(api_key, model, system, messages, max_tokens, timeout, opener
                 convo.append({"role": "tool", "tool_call_id": s["id"], "content": _tool_result_str(out)})
             continue
         break
-    return "".join(all_text).strip()
+    return "".join(all_text).strip() or "(stopped after tool rounds)"
 
 
 def _gemini_stream(api_key, model, system, messages, max_tokens, timeout, opener,
@@ -402,7 +413,7 @@ def _gemini_stream(api_key, model, system, messages, max_tokens, timeout, opener
                 for c in calls]})
             continue
         break
-    return "".join(all_text).strip()
+    return "".join(all_text).strip() or "(stopped after tool rounds)"
 
 
 SYSTEM_PREAMBLE = (

@@ -187,17 +187,32 @@ def _timing_findings(scan: Optional[AutoScan], log: Optional[MeasuringLog],
     return out
 
 
+def _nearest_value(times, values, when):
+    """Value at the sample whose time is closest to `when` (skips None)."""
+    best = best_dt = None
+    for k in range(len(times)):
+        if values[k] is None:
+            continue
+        dt = abs(times[k] - when)
+        if best_dt is None or dt < best_dt:
+            best_dt, best = dt, values[k]
+    return best
+
+
 def _max_abs_diff(log: MeasuringLog, a_name: str, b_name: str):
-    """Largest |a-b| across time-aligned samples of two channels (or None)."""
+    """Largest |a-b| with the two channels aligned by TIME (each raw_series drops
+    None rows independently, so list indices are not interchangeable)."""
     a = log.raw_series.get(a_name)
     b = log.raw_series.get(b_name)
     if not a or not b:
         return None
-    n = min(len(a["value"]), len(b["value"]))
     worst = 0.0
-    for i in range(n):
-        av, bv = a["value"][i], b["value"][i]
-        if av is None or bv is None:
+    for i in range(len(a["value"])):
+        av = a["value"][i]
+        if av is None:
+            continue
+        bv = _nearest_value(b["time"], b["value"], a["time"][i])
+        if bv is None:
             continue
         worst = max(worst, abs(av - bv))
     return worst
@@ -312,17 +327,20 @@ def _divergence_finding(log: MeasuringLog, issues: dict) -> Optional[Finding]:
         return None
     s = log.raw_series.get(spec.name)
     a = log.raw_series.get(actual.name)
-    if not s or not a:
-        return None
-    n = min(len(s["value"]), len(a["value"]))
-    if n == 0:
+    if not s or not a or not s["value"]:
         return None
     worst, worst_t = 0.0, None
-    for i in range(n):
-        d = s["value"][i] - a["value"][i]
+    for i in range(len(s["value"])):
+        sv = s["value"][i]
+        if sv is None:
+            continue
+        av = _nearest_value(a["time"], a["value"], s["time"][i])  # align by time
+        if av is None:
+            continue
+        d = sv - av
         if d > worst:
             worst, worst_t = d, s["time"][i]
-    base = max((abs(x) for x in s["value"][:n]), default=0.0) or 1.0
+    base = max((abs(x) for x in s["value"] if x is not None), default=0.0) or 1.0
     rel = worst / base
     if rel < 0.08:
         return None

@@ -38,6 +38,19 @@ class Battery:
     charging_v: Optional[float]
 
 
+def _at(series, when):
+    """Value at the sample whose time is nearest `when` (skips None)."""
+    best = best_dt = None
+    times, values = series["time"], series["value"]
+    for k in range(len(times)):
+        if values[k] is None:
+            continue
+        dt = abs(times[k] - when)
+        if best_dt is None or dt < best_dt:
+            best_dt, best = dt, values[k]
+    return best
+
+
 def _find(log: MeasuringLog, *names):
     for n in names:
         ch = log.channel(n)
@@ -86,12 +99,15 @@ def fuel_economy(log: MeasuringLog) -> Optional[FuelEconomy]:
         dist_km += spd / 3600.0 * dt
         if spd < 2:
             idle += dt
+        # Resolve fuel-rate/MAF at the speed sample's TIME — the fuel and speed
+        # channels drop None rows independently, so their list indices don't line
+        # up in general.
         if rser is not None:
-            r = rser["value"][i] if i < len(rser["value"]) else None
+            r = _at(rser, t[i])
             if r is not None:
                 fuel_l += r / 3600.0 * dt  # L/h -> L
         else:
-            m = mser["value"][i] if i < len(mser["value"]) else None
+            m = _at(mser, t[i])
             if m is not None:
                 fuel_l += (m / _AFR / _FUEL_DENSITY_G_PER_L) * dt
 

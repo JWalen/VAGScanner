@@ -690,10 +690,13 @@ def _threshold_events(log, series, rules) -> List[Event]:
     for rule in rules:
         chan_q = str(rule.get("channel", "")).lower()
         op = rule.get("op", ">")
-        thr = float(rule.get("value"))
         fn = _OPS.get(op)
         if fn is None:
             continue
+        try:
+            thr = float(rule.get("value"))
+        except (TypeError, ValueError):
+            continue  # skip a malformed rule rather than abort the whole call
         for ch in log.channels:
             if chan_q and chan_q not in ch.name.lower():
                 continue

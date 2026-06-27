@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.27.0] - 2026-06-27
+
+### Fixed (audit round 2)
+- **Live alert banner now fires on partial channel names.** It used an exact key
+  lookup, so a rule like `Boost > 100` never alerted (the value key is
+  "Boost (derived)") even though event-capture and the gauges did — now all three
+  use the same substring match.
+- **Time-aligned cross-channel math.** Boost target-vs-actual, cam-timing
+  deviation, and fuel economy now align the two channels by **time** instead of by
+  list index (each channel drops missing rows independently, so indices didn't line
+  up) — fixing silently wrong numbers on logs with gaps.
+- **`find_log_events` no longer crashes** on a malformed threshold rule (the other
+  threshold path was missing the guard).
+- **AI chat fixes:** a reply can no longer land in the wrong conversation if you
+  switch chats mid-answer; a second send while one is in flight is ignored;
+  streaming returns a clear "(stopped…)" notice instead of blank on tool-round
+  exhaustion; mid-stream provider errors (rate limit/overload) are now surfaced.
+- **Clean shutdown:** the AI-chat and update-check/download worker threads are now
+  stopped on exit (no "QThread destroyed while running" crash).
+- **Auto-identify no longer overwrites your default profile.** A VIN-derived brand
+  profile now applies for the session only; your saved default is untouched.
+
 ## [1.26.0] - 2026-06-27
 
 ### Fixed (from a multi-agent functionality/security/UI-UX audit)
@@ -681,7 +703,8 @@ First public release.
   installer, and publishes a GitHub Release on each `v*` tag.
 - 54-test pytest suite (no hardware; the live path is mocked).
 
-[Unreleased]: https://github.com/JWalen/OBD-Toolkit/compare/v1.26.0...HEAD
+[Unreleased]: https://github.com/JWalen/OBD-Toolkit/compare/v1.27.0...HEAD
+[1.27.0]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v1.27.0
 [1.26.0]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v1.26.0
 [1.25.2]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v1.25.2
 [1.25.1]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v1.25.1
