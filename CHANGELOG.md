@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.33.0] - 2026-06-28
+
+### Changed — UI/UX overhaul (polished, more intuitive flow)
+- **New design system.** Rebuilt the theme around proper elevation layers
+  (background → surface → elevated) with crisp hairline borders, rounded cards,
+  refined inputs/buttons/menus/scrollbars, hover/focus states, and a single shared
+  template so **light and dark stay at parity** (the light theme was previously
+  half-styled). Fixed a bug where labels painted opaque bands over cards.
+- **Clearer flow & primary actions.** Every page now has a consistent header
+  (title + one-line subtitle), and the primary action on each is the accent button:
+  **Connect** and **Start Logging** (Live), **Open Measuring CSV** (Files),
+  **Send** (AI).
+- **Guided affordances.** On **Files**, the Diagnose/Performance/Compare/Export/
+  view actions are **disabled until a log is loaded** (no more silent no-ops); on
+  **Live**, the record toolbar is grouped into *monitoring* (Gauges, Live Data,
+  Alerts) and *recording* (duration/rate/name, Start/Stop) with a divider.
+- **Actionable empty states.** The Dashboard's *Active vehicle* panel now offers
+  **Open Garage** / **Identify on Live** instead of being a read-only dead end.
+- **Consistent iconography & copy.** Replaced inconsistent emoji on action buttons
+  with clean labels, and fixed stale "Tab 1 / Tab 2" wording to the current
+  sidebar page names throughout.
+- Verified by a harness that **clicks every button and opens every dialog** plus a
+  screenshot review of every page in both themes.
+
 ## [1.32.0] - 2026-06-27
 
 ### Added — Linux & Raspberry Pi
@@ -800,7 +824,8 @@ First public release.
   installer, and publishes a GitHub Release on each `v*` tag.
 - 54-test pytest suite (no hardware; the live path is mocked).
 
-[Unreleased]: https://github.com/JWalen/OBD-Toolkit/compare/v1.32.0...HEAD
+[Unreleased]: https://github.com/JWalen/OBD-Toolkit/compare/v1.33.0...HEAD
+[1.33.0]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v1.33.0
 [1.32.0]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v1.32.0
 [1.31.0]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v1.31.0
 [1.30.0]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v1.30.0

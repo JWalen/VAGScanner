@@ -110,69 +110,133 @@ _PALETTE = [
 if _HAVE_QT:
     pg.setConfigOptions(antialias=True, background="w", foreground="k")
 
-    # Carbon "motorsport" palette — the default look.
+    # Design tokens with proper elevation layers (bg < base < surface < elevated).
+    # Carbon "motorsport" dark is the default; light mirrors the same structure.
     CARBON = {
-        "bg": "#15171C", "base": "#0F1115", "surface": "#1E2228", "line": "#262A31",
-        "text": "#E8EAED", "muted": "#A8AEB8", "accent": "#FF6A00", "accent2": "#FF7E26",
+        "bg": "#0F1115", "base": "#15181E", "surface": "#1A1E25", "elevated": "#222732",
+        "hover": "#2B313C", "line": "#272C35", "line2": "#363D49",
+        "text": "#E8EAED", "muted": "#969DA9", "subtle": "#646B77",
+        "accent": "#FF6A00", "accent2": "#FF8A33", "accent_fg": "#0F1115",
+        "accent_soft": "rgba(255,106,0,0.16)", "sel": "#FF6A00", "sel_fg": "#0F1115",
         "red": "#E10600",
     }
+    LIGHT = {
+        "bg": "#F3F5F8", "base": "#FFFFFF", "surface": "#FFFFFF", "elevated": "#F1F4F8",
+        "hover": "#E9EEF4", "line": "#E4E8EE", "line2": "#D2D9E2",
+        "text": "#1A202C", "muted": "#5B6573", "subtle": "#9AA3B0",
+        "accent": "#0066CC", "accent2": "#1E7AE0", "accent_fg": "#FFFFFF",
+        "accent_soft": "rgba(0,102,204,0.10)", "sel": "#0066CC", "sel_fg": "#FFFFFF",
+        "red": "#E53E3E",
+    }
 
-    _CARBON_QSS = """
-    QWidget {{ background:{bg}; color:{text}; }}
+    # One template, formatted per theme — so light and dark can never drift apart.
+    _QSS_TEMPLATE = """
+    * {{ outline:0; }}
+    QWidget {{ background:{bg}; color:{text}; font-size:10pt; }}
     QMainWindow, QDialog {{ background:{bg}; }}
-    QFrame#Sidebar {{ background:{base}; border-right:1px solid {line}; }}
-    QLabel#Brand {{ color:{accent}; font-size:13pt; font-weight:bold; }}
-    QToolButton#Nav {{ color:{muted}; border:none; padding:10px 12px; text-align:left;
-        border-radius:8px; font-size:10.5pt; }}
-    QToolButton#Nav:hover {{ background:{surface}; color:{text}; }}
-    QToolButton#Nav:checked {{ background:{surface}; color:{accent};
-        border-left:3px solid {accent}; }}
-    QFrame#Card {{ background:{surface}; border:1px solid {line}; border-radius:12px; }}
-    QLabel#H1 {{ font-size:18pt; font-weight:bold; color:{text}; }}
+    /* Labels/checks must be transparent so they don't paint bands over cards. */
+    QLabel, QCheckBox, QRadioButton, QToolButton {{ background:transparent; }}
+
+    QFrame#Sidebar {{ background:{base}; border:none; border-right:1px solid {line}; }}
+    QLabel#Brand {{ color:{text}; font-size:13.5pt; font-weight:700; }}
+    QToolButton#Nav {{ color:{muted}; border:none; padding:9px 12px; text-align:left;
+        border-radius:9px; font-size:10.5pt; }}
+    QToolButton#Nav:hover {{ background:{elevated}; color:{text}; }}
+    QToolButton#Nav:checked {{ background:{accent_soft}; color:{accent}; font-weight:600; }}
+
+    QFrame#Card {{ background:{surface}; border:1px solid {line}; border-radius:14px; }}
+    QFrame#Card:hover {{ border-color:{line2}; }}
+    QLabel#H1 {{ font-size:19pt; font-weight:700; color:{text}; }}
+    QLabel#H2 {{ font-size:12.5pt; font-weight:600; color:{text}; }}
     QLabel#Muted {{ color:{muted}; }}
-    QPushButton {{ background:{surface}; color:{text}; border:1px solid {line};
-        border-radius:8px; padding:7px 14px; }}
-    QPushButton:hover {{ background:#2E333B; }}
-    QPushButton:disabled {{ color:#5A616B; background:#1A1D23; border-color:#22262E; }}
-    QPushButton#Accent {{ background:{accent}; color:#15171C; border:none; font-weight:bold; }}
+
+    QPushButton {{ background:{elevated}; color:{text}; border:1px solid {line2};
+        border-radius:9px; padding:8px 15px; }}
+    QPushButton:hover {{ background:{hover}; border-color:{accent}; }}
+    QPushButton:pressed {{ background:{surface}; }}
+    QPushButton:disabled {{ color:{subtle}; background:{base}; border-color:{line}; }}
+    QPushButton#Accent {{ background:{accent}; color:{accent_fg}; border:none; font-weight:700; }}
     QPushButton#Accent:hover {{ background:{accent2}; }}
-    QTabWidget::pane {{ border:1px solid {line}; }}
-    QTabBar::tab {{ background:#1A1D23; color:{muted}; padding:7px 14px; border:1px solid {line};
-        border-bottom:none; }}
-    QTabBar::tab:selected {{ background:{surface}; color:{accent}; }}
-    QLineEdit, QPlainTextEdit, QTextEdit, QComboBox, QSpinBox, QDoubleSpinBox,
-    QListWidget, QTableWidget, QTreeWidget, QTextBrowser {{
-        background:{base}; color:{text}; border:1px solid #2A2F37; border-radius:6px;
-        selection-background-color:{accent}; selection-color:#15171C; }}
-    QHeaderView::section {{ background:#1A1D23; color:{muted}; border:none; padding:4px; }}
-    QMenuBar {{ background:{base}; color:{text}; }}
-    QMenuBar::item:selected {{ background:{surface}; }}
-    QMenu {{ background:#1A1D23; color:{text}; border:1px solid #2A2F37; }}
-    QMenu::item:selected {{ background:{accent}; color:#15171C; }}
-    QStatusBar {{ background:{base}; color:{muted}; }}
-    QToolTip {{ color:{text}; background:{surface}; border:1px solid {line}; }}
-    QScrollBar:vertical {{ background:{bg}; width:12px; margin:0; }}
-    QScrollBar::handle:vertical {{ background:#2E333B; border-radius:6px; min-height:24px; }}
-    QScrollBar::add-line, QScrollBar::sub-line {{ height:0; }}
-    QCheckBox, QRadioButton {{ color:{text}; }}
-    QGroupBox {{ border:1px solid {line}; border-radius:8px; margin-top:8px; }}
-    QGroupBox::title {{ subcontrol-origin:margin; left:10px; color:{muted}; }}
+    QPushButton#Accent:pressed {{ background:{accent}; }}
+
+    QLineEdit, QPlainTextEdit, QTextEdit, QComboBox, QSpinBox, QDoubleSpinBox, QTextBrowser {{
+        background:{base}; color:{text}; border:1px solid {line2}; border-radius:9px;
+        padding:6px 10px; selection-background-color:{sel}; selection-color:{sel_fg}; }}
+    QLineEdit:focus, QPlainTextEdit:focus, QTextEdit:focus, QComboBox:focus,
+    QSpinBox:focus, QDoubleSpinBox:focus {{ border-color:{accent}; }}
+    QComboBox::drop-down {{ border:0; width:22px; }}
+    QComboBox QAbstractItemView {{ background:{surface}; border:1px solid {line2};
+        border-radius:8px; padding:4px; selection-background-color:{accent};
+        selection-color:{accent_fg}; }}
+
+    QListWidget, QTableWidget, QTreeWidget {{
+        background:{base}; color:{text}; border:1px solid {line}; border-radius:12px;
+        selection-background-color:{accent}; selection-color:{accent_fg}; }}
+    QListWidget::item, QTreeWidget::item {{ padding:5px 6px; border-radius:6px; }}
+    QListWidget::item:hover, QTreeWidget::item:hover {{ background:{elevated}; }}
+    QListWidget::item:selected, QTreeWidget::item:selected {{
+        background:{accent_soft}; color:{accent}; }}
+    QTableWidget {{ gridline-color:{line}; }}
+    QHeaderView::section {{ background:{surface}; color:{muted}; border:0;
+        border-bottom:1px solid {line}; padding:6px 8px; font-weight:600; }}
+
+    QMenuBar {{ background:{base}; color:{text}; border-bottom:1px solid {line}; }}
+    QMenuBar::item {{ padding:6px 10px; background:transparent; border-radius:6px; }}
+    QMenuBar::item:selected {{ background:{elevated}; }}
+    QMenu {{ background:{surface}; color:{text}; border:1px solid {line2};
+        border-radius:10px; padding:6px; }}
+    QMenu::item {{ padding:6px 22px; border-radius:6px; }}
+    QMenu::item:selected {{ background:{accent}; color:{accent_fg}; }}
+    QMenu::separator {{ height:1px; background:{line}; margin:6px 8px; }}
+    QStatusBar {{ background:{base}; color:{muted}; border-top:1px solid {line}; }}
+    QToolTip {{ color:{text}; background:{surface}; border:1px solid {line2};
+        padding:6px 8px; border-radius:7px; }}
+
+    QScrollBar:vertical {{ background:transparent; width:11px; margin:2px; }}
+    QScrollBar::handle:vertical {{ background:{line2}; border-radius:5px; min-height:28px; }}
+    QScrollBar::handle:vertical:hover {{ background:{muted}; }}
+    QScrollBar:horizontal {{ background:transparent; height:11px; margin:2px; }}
+    QScrollBar::handle:horizontal {{ background:{line2}; border-radius:5px; min-width:28px; }}
+    QScrollBar::handle:horizontal:hover {{ background:{muted}; }}
+    QScrollBar::add-line, QScrollBar::sub-line {{ height:0; width:0; }}
+    QScrollBar::add-page, QScrollBar::sub-page {{ background:transparent; }}
+
+    QCheckBox, QRadioButton {{ color:{text}; spacing:7px; }}
+    QGroupBox {{ border:1px solid {line}; border-radius:12px; margin-top:14px;
+        padding:12px; background:{surface}; }}
+    QGroupBox::title {{ subcontrol-origin:margin; subcontrol-position:top left;
+        left:12px; padding:0 6px; color:{muted}; font-weight:600; }}
+    QTabWidget::pane {{ border:1px solid {line}; border-radius:10px; }}
+    QTabBar::tab {{ background:transparent; color:{muted}; padding:8px 16px;
+        border:0; border-bottom:2px solid transparent; }}
+    QTabBar::tab:selected {{ color:{accent}; border-bottom:2px solid {accent}; }}
+    QTabBar::tab:hover {{ color:{text}; }}
+    QProgressBar {{ background:{base}; border:1px solid {line}; border-radius:7px;
+        text-align:center; height:16px; }}
+    QProgressBar::chunk {{ background:{accent}; border-radius:6px; }}
+    QSplitter::handle {{ background:{line}; }}
+    QFrame#Sep {{ background:{line}; border:0; }}
     """
 
-    _LIGHT_QSS = """
-    QFrame#Sidebar { background:#EEF1F5; border-right:1px solid #DBE0E6; }
-    QLabel#Brand { color:#0066CC; font-size:13pt; font-weight:bold; }
-    QToolButton#Nav { color:#4A5568; border:none; padding:10px 12px; text-align:left;
-        border-radius:8px; font-size:10.5pt; }
-    QToolButton#Nav:hover { background:#E2E8F0; }
-    QToolButton#Nav:checked { background:#FFFFFF; color:#0066CC; border-left:3px solid #0066CC; }
-    QFrame#Card { background:#FFFFFF; border:1px solid #E2E8F0; border-radius:12px; }
-    QLabel#H1 { font-size:18pt; font-weight:bold; color:#1A202C; }
-    QLabel#Muted { color:#718096; }
-    QPushButton#Accent { background:#0066CC; color:#FFFFFF; border:none; font-weight:bold;
-        border-radius:8px; padding:7px 14px; }
-    QPushButton#Accent:hover { background:#0a72db; }
-    """
+    def _theme_palette(t: dict) -> "QtGui.QPalette":
+        c = QtGui.QColor
+        p = QtGui.QPalette()
+        p.setColor(QtGui.QPalette.Window, c(t["bg"]))
+        p.setColor(QtGui.QPalette.WindowText, c(t["text"]))
+        p.setColor(QtGui.QPalette.Base, c(t["base"]))
+        p.setColor(QtGui.QPalette.AlternateBase, c(t["surface"]))
+        p.setColor(QtGui.QPalette.Text, c(t["text"]))
+        p.setColor(QtGui.QPalette.Button, c(t["elevated"]))
+        p.setColor(QtGui.QPalette.ButtonText, c(t["text"]))
+        p.setColor(QtGui.QPalette.Highlight, c(t["accent"]))
+        p.setColor(QtGui.QPalette.HighlightedText, c(t["accent_fg"]))
+        p.setColor(QtGui.QPalette.ToolTipBase, c(t["surface"]))
+        p.setColor(QtGui.QPalette.ToolTipText, c(t["text"]))
+        p.setColor(QtGui.QPalette.PlaceholderText, c(t["muted"]))
+        p.setColor(QtGui.QPalette.Link, c(t["accent2"]))
+        for role in (QtGui.QPalette.WindowText, QtGui.QPalette.Text, QtGui.QPalette.ButtonText):
+            p.setColor(QtGui.QPalette.Disabled, role, c(t["subtle"]))
+        return p
 
     def apply_theme(dark: bool):
         """Apply the carbon (dark) or light theme to the whole application."""
@@ -180,29 +244,9 @@ if _HAVE_QT:
         if app is None:
             return
         app.setStyle("Fusion")
-        if not dark:
-            app.setPalette(app.style().standardPalette())
-            app.setStyleSheet(_LIGHT_QSS)
-            return
-        c = QtGui.QColor
-        p = QtGui.QPalette()
-        p.setColor(QtGui.QPalette.Window, c(CARBON["bg"]))
-        p.setColor(QtGui.QPalette.WindowText, c(CARBON["text"]))
-        p.setColor(QtGui.QPalette.Base, c(CARBON["base"]))
-        p.setColor(QtGui.QPalette.AlternateBase, c(CARBON["surface"]))
-        p.setColor(QtGui.QPalette.Text, c(CARBON["text"]))
-        p.setColor(QtGui.QPalette.Button, c(CARBON["surface"]))
-        p.setColor(QtGui.QPalette.ButtonText, c(CARBON["text"]))
-        p.setColor(QtGui.QPalette.Highlight, c(CARBON["accent"]))
-        p.setColor(QtGui.QPalette.HighlightedText, c(CARBON["bg"]))
-        p.setColor(QtGui.QPalette.ToolTipBase, c(CARBON["surface"]))
-        p.setColor(QtGui.QPalette.ToolTipText, c(CARBON["text"]))
-        p.setColor(QtGui.QPalette.PlaceholderText, c(CARBON["muted"]))
-        p.setColor(QtGui.QPalette.Link, c(CARBON["accent2"]))
-        for role in (QtGui.QPalette.WindowText, QtGui.QPalette.Text, QtGui.QPalette.ButtonText):
-            p.setColor(QtGui.QPalette.Disabled, role, c("#5A616B"))
-        app.setPalette(p)
-        app.setStyleSheet(_CARBON_QSS.format(**CARBON))
+        tokens = CARBON if dark else LIGHT
+        app.setPalette(_theme_palette(tokens))
+        app.setStyleSheet(_QSS_TEMPLATE.format(**tokens))
 
     # Clean stroke icons (lucide.dev paths, ISC-licensed), tinted at runtime so
     # they match the theme — replaces inconsistent emoji glyphs.
@@ -519,7 +563,33 @@ if _HAVE_QT:
             return entry["v"][i]
 
     # --------------------------------------------------------------------- #
-    # Tab 1 — File Analyzer
+    # Shared layout helpers — consistent page headers, section titles, dividers.
+    # --------------------------------------------------------------------- #
+    def _page_header(title: str, subtitle: str = "") -> "QtWidgets.QVBoxLayout":
+        box = QtWidgets.QVBoxLayout()
+        box.setSpacing(1)
+        h = QtWidgets.QLabel(title)
+        h.setObjectName("H1")
+        box.addWidget(h)
+        if subtitle:
+            s = QtWidgets.QLabel(subtitle)
+            s.setObjectName("Muted")
+            box.addWidget(s)
+        return box
+
+    def _h2(text: str) -> "QtWidgets.QLabel":
+        lbl = QtWidgets.QLabel(text)
+        lbl.setObjectName("H2")
+        return lbl
+
+    def _vsep() -> "QtWidgets.QFrame":
+        f = QtWidgets.QFrame()
+        f.setObjectName("Sep")
+        f.setFixedSize(1, 22)
+        return f
+
+    # --------------------------------------------------------------------- #
+    # Files — open & analyze logs / Auto-Scans
     # --------------------------------------------------------------------- #
     class FileAnalyzerTab(QtWidgets.QWidget):
         def __init__(self, parent=None):
@@ -531,31 +601,38 @@ if _HAVE_QT:
 
         def _build(self):
             outer = QtWidgets.QVBoxLayout(self)
+            outer.setContentsMargins(24, 20, 24, 18)
+            outer.setSpacing(14)
+            outer.addLayout(_page_header(
+                "Files", "Open a measuring log or Auto-Scan to chart and diagnose it."))
 
-            # toolbar (wraps on narrow windows)
+            # toolbar (wraps on narrow windows), grouped: open · analyze · view
             bar = FlowLayout()
             self.btn_open = QtWidgets.QPushButton("Open Measuring CSV…")
+            self.btn_open.setObjectName("Accent")
             self.btn_scan = QtWidgets.QPushButton("Open Auto-Scan…")
             self.chk_norm = QtWidgets.QCheckBox("Normalize")
             self.chk_norm.setChecked(True)
             self.chk_measure = QtWidgets.QCheckBox("Measure")
             self.chk_measure.setToolTip("Two-cursor mode: click to drop a second cursor and read Δ")
-            self.btn_fit = QtWidgets.QPushButton("⤢ Fit")
+            self.btn_fit = QtWidgets.QPushButton("Fit")
             self.btn_fit.setToolTip("Auto-fit the graph to all visible data")
             self.btn_export = QtWidgets.QPushButton("Export View…")
             self.view_combo = QtWidgets.QComboBox()
-            self.view_combo.addItems(["📈 Graph", "▦ Data"])
+            self.view_combo.addItems(["Graph", "Data"])
             self.view_combo.setToolTip("Switch between the line graph and the raw data table")
-            self.btn_diagnose = QtWidgets.QPushButton("🔍 Diagnose")
+            self.btn_diagnose = QtWidgets.QPushButton("Diagnose")
             self.btn_diagnose.setToolTip("Analyze the loaded log and/or Auto-Scan for likely faults")
-            self.btn_perf = QtWidgets.QPushButton("📈 Performance")
+            self.btn_perf = QtWidgets.QPushButton("Performance")
             self.btn_perf.setToolTip("Acceleration runs, pulls and an estimated power figure")
-            self.btn_compare = QtWidgets.QPushButton("⇄ Compare…")
+            self.btn_compare = QtWidgets.QPushButton("Compare…")
             self.btn_compare.setToolTip("Open a second log and compare it (before/after)")
             self.lbl_info = QtWidgets.QLabel("No file loaded.")
-            for w in (self.btn_open, self.btn_scan, self.btn_diagnose, self.btn_perf,
-                      self.btn_compare, self.chk_norm, self.chk_measure, self.btn_fit,
-                      self.btn_export, self.view_combo):
+            self.lbl_info.setObjectName("Muted")
+            for w in (self.btn_open, self.btn_scan, _vsep(),
+                      self.btn_diagnose, self.btn_perf, self.btn_compare, _vsep(),
+                      self.view_combo, self.chk_norm, self.chk_measure, self.btn_fit,
+                      self.btn_export):
                 bar.addWidget(w)
             bar.addWidget(self.lbl_info)
             outer.addLayout(bar)
@@ -566,11 +643,12 @@ if _HAVE_QT:
             # left: channels + events + rules
             left = QtWidgets.QWidget()
             lv = QtWidgets.QVBoxLayout(left)
-            lv.addWidget(QtWidgets.QLabel("<b>Channels</b>"))
+            lv.setContentsMargins(0, 0, 0, 0)
+            lv.addWidget(_h2("Channels"))
             self.chan_list = QtWidgets.QListWidget()
             lv.addWidget(self.chan_list, 2)
 
-            lv.addWidget(QtWidgets.QLabel("<b>Events</b>"))
+            lv.addWidget(_h2("Events"))
             self.event_list = QtWidgets.QListWidget()
             lv.addWidget(self.event_list, 2)
 
@@ -613,7 +691,8 @@ if _HAVE_QT:
             # right: autoscan
             right = QtWidgets.QWidget()
             rv = QtWidgets.QVBoxLayout(right)
-            rv.addWidget(QtWidgets.QLabel("<b>Auto-Scan</b>"))
+            rv.setContentsMargins(0, 0, 0, 0)
+            rv.addWidget(_h2("Auto-Scan"))
             self.scan_info = QtWidgets.QLabel("No scan loaded.")
             self.scan_info.setWordWrap(True)
             rv.addWidget(self.scan_info)
@@ -641,6 +720,7 @@ if _HAVE_QT:
             self.btn_add_rule.clicked.connect(self._add_rule)
             self.btn_clear_rules.clicked.connect(self._clear_rules)
             self.event_list.itemClicked.connect(self._event_clicked)
+            self._update_actions()  # start with analysis disabled until a log loads
 
         def set_advanced(self, on: bool):
             self.rule_box.setVisible(on)
@@ -745,6 +825,19 @@ if _HAVE_QT:
             )
             self.event_list.clear()
             self._refresh_data_view()
+            self._update_actions()
+
+        def _update_actions(self):
+            """Enable analysis/view actions only when the data they need is loaded."""
+            has_log = self.mlog is not None
+            for w in (self.btn_perf, self.btn_compare, self.btn_export, self.btn_fit,
+                      self.chk_measure, self.view_combo, self.btn_find, self.btn_apply_rules):
+                w.setEnabled(has_log)
+            self.btn_diagnose.setEnabled(has_log or self.scan is not None)
+            if has_log:
+                self.lbl_info.setObjectName("")  # normal text once loaded
+            self.lbl_info.style().unpolish(self.lbl_info)
+            self.lbl_info.style().polish(self.lbl_info)
 
         def open_scan_dialog(self):
             path, _ = QtWidgets.QFileDialog.getOpenFileName(
@@ -787,6 +880,7 @@ if _HAVE_QT:
                     node.addChild(child)
                 self.scan_tree.addTopLevelItem(node)
                 node.setExpanded(True)
+            self._update_actions()
 
         def run_diagnosis(self):
             if self.mlog is None and self.scan is None:
@@ -1113,6 +1207,10 @@ if _HAVE_QT:
 
         def _build(self):
             outer = QtWidgets.QVBoxLayout(self)
+            outer.setContentsMargins(24, 20, 24, 18)
+            outer.setSpacing(12)
+            outer.addLayout(_page_header(
+                "Live", "Connect a generic ELM327 adapter to read codes and stream live data."))
 
             # connection bar
             conn_box = QtWidgets.QGroupBox("Adapter")
@@ -1124,14 +1222,15 @@ if _HAVE_QT:
                 "USB/Bluetooth adapters appear as a COM port (pair Bluetooth first).\n"
                 "Wi-Fi adapters use socket://HOST:PORT — use the Wi-Fi button.")
             self.btn_refresh = QtWidgets.QPushButton("Scan Ports")
-            self.btn_wifi = QtWidgets.QPushButton("📶 Wi-Fi…")
+            self.btn_wifi = QtWidgets.QPushButton("Wi-Fi…")
             self.btn_wifi.setToolTip("Connect to a Wi-Fi ELM327 adapter (e.g. 192.168.0.10:35000)")
             self.baud_combo = QtWidgets.QComboBox()
             self.baud_combo.addItems(["Auto", "38400", "9600", "115200"])
-            self.chk_async = QtWidgets.QCheckBox("⚡ Smooth")
+            self.chk_async = QtWidgets.QCheckBox("Smooth")
             self.chk_async.setToolTip("Async mode: the adapter polls in the background and reads "
                                       "come from a live cache — much smoother high-rate streaming")
             self.btn_connect = QtWidgets.QPushButton("Connect")
+            self.btn_connect.setObjectName("Accent")
             self.btn_disconnect = QtWidgets.QPushButton("Disconnect")
             self.btn_disconnect.setEnabled(False)
             self.conn_status = QtWidgets.QLabel("Not connected.")
@@ -1169,7 +1268,7 @@ if _HAVE_QT:
             pid_box = QtWidgets.QWidget()
             pv = QtWidgets.QVBoxLayout(pid_box)
             pv.setContentsMargins(0, 0, 0, 0)
-            pv.addWidget(QtWidgets.QLabel("<b>Supported PIDs</b>"))
+            pv.addWidget(_h2("Supported PIDs"))
             self.pid_search = QtWidgets.QLineEdit()
             self.pid_search.setPlaceholderText("Search PIDs…  (e.g. boost, temp, fuel, O2)")
             self.pid_search.setClearButtonEnabled(True)
@@ -1236,7 +1335,7 @@ if _HAVE_QT:
             dbar = FlowLayout()
             self.btn_read_dtc = QtWidgets.QPushButton("Read DTCs")
             self.btn_clear_dtc = QtWidgets.QPushButton("Clear DTCs…")
-            self.btn_vehinfo = QtWidgets.QPushButton("ⓘ Vehicle Info")
+            self.btn_vehinfo = QtWidgets.QPushButton("Vehicle Info")
             self.btn_vehinfo.setToolTip("VIN, calibration IDs, emissions readiness, permanent DTCs")
             self.btn_mode06 = QtWidgets.QPushButton("Mode 06")
             self.btn_mode06.setToolTip("On-board monitoring test results (catalyst, O2, EVAP…)")
@@ -1260,8 +1359,19 @@ if _HAVE_QT:
             split.addWidget(self.plot)
             split.setSizes([400, 720])
 
-            # logging controls
+            # logging controls — grouped: live monitoring | recording
             run_bar = FlowLayout()
+            self.btn_gauges = QtWidgets.QPushButton("Gauges")
+            self.btn_gauges.setToolTip("Open a live gauge dashboard for the selected PIDs")
+            run_bar.addWidget(self.btn_gauges)
+            self.btn_livedata = QtWidgets.QPushButton("Live Data")
+            self.btn_livedata.setToolTip("Open an always-on live data table for the selected PIDs")
+            run_bar.addWidget(self.btn_livedata)
+            self.chk_alert = QtWidgets.QCheckBox("Alerts")
+            self.chk_alert.setChecked(True)
+            self.chk_alert.setToolTip("Flash and beep when a threshold rule is breached live")
+            run_bar.addWidget(self.chk_alert)
+            run_bar.addWidget(_vsep())
             run_bar.addWidget(QtWidgets.QLabel("Duration (s):"))
             self.dur_spin = QtWidgets.QSpinBox()
             self.dur_spin.setRange(1, live.MAX_SESSION_SECONDS)
@@ -1277,22 +1387,14 @@ if _HAVE_QT:
             self.name_edit.setPlaceholderText("session name (optional)")
             self.name_edit.setMaximumWidth(180)
             run_bar.addWidget(self.name_edit)
-            self.btn_gauges = QtWidgets.QPushButton("📊 Gauges")
-            self.btn_gauges.setToolTip("Open a live gauge dashboard for the selected PIDs")
-            run_bar.addWidget(self.btn_gauges)
-            self.btn_livedata = QtWidgets.QPushButton("📋 Live Data")
-            self.btn_livedata.setToolTip("Open an always-on live data table for the selected PIDs")
-            run_bar.addWidget(self.btn_livedata)
-            self.chk_alert = QtWidgets.QCheckBox("🔔 Alerts")
-            self.chk_alert.setChecked(True)
-            self.chk_alert.setToolTip("Flash and beep when a threshold rule is breached live")
-            run_bar.addWidget(self.chk_alert)
             self.btn_start = QtWidgets.QPushButton("Start Logging")
+            self.btn_start.setObjectName("Accent")
             self.btn_stop = QtWidgets.QPushButton("Stop")
             self.btn_stop.setEnabled(False)
             run_bar.addWidget(self.btn_start)
             run_bar.addWidget(self.btn_stop)
             self.run_status = QtWidgets.QLabel("")
+            self.run_status.setObjectName("Muted")
             run_bar.addWidget(self.run_status)
             outer.addLayout(run_bar)
 
@@ -3075,7 +3177,7 @@ if _HAVE_QT:
             self.chat_list = QtWidgets.QListWidget()
             self.chat_list.setToolTip("Double-click to rename")
             left.addWidget(self.chat_list, 1)
-            self.btn_delete = QtWidgets.QPushButton("🗑  Delete")
+            self.btn_delete = QtWidgets.QPushButton("Delete")
             left.addWidget(self.btn_delete)
             left_w = QtWidgets.QWidget()
             left_w.setLayout(left)
@@ -3087,7 +3189,7 @@ if _HAVE_QT:
             header = FlowLayout()
             self.model_label = QtWidgets.QLabel("")
             self.model_label.setObjectName("Muted")
-            self.btn_settings = QtWidgets.QPushButton("⚙ AI Settings")
+            self.btn_settings = QtWidgets.QPushButton("AI Settings")
             self.chk_context = QtWidgets.QCheckBox("Use scan/log as context")
             self.chk_context.setChecked(True)
             self.chk_tools = QtWidgets.QCheckBox("Let the AI use tools")
@@ -3109,6 +3211,7 @@ if _HAVE_QT:
             self.input.setMaximumHeight(90)
             entry.addWidget(self.input, 1)
             self.btn_send = QtWidgets.QPushButton("Send")
+            self.btn_send.setObjectName("Accent")
             entry.addWidget(self.btn_send)
             right.addLayout(entry)
             root.addLayout(right, 1)
@@ -3161,8 +3264,8 @@ if _HAVE_QT:
                 f"ai/model/{pid}", prov.default_model if prov else "", type=str)
             has_key = bool(self.settings.value(f"ai/key/{pid}", "", type=str))
             name = prov.label if prov else pid
-            tail = "" if has_key else "  —  no API key (open ⚙ AI Settings)"
-            self.model_label.setText(f"🤖 {name} · {model}{tail}")
+            tail = "" if has_key else "  —  no API key (open AI Settings)"
+            self.model_label.setText(f"{name} · {model}{tail}")
 
         def refresh_vehicle(self):
             """Called when the tab is shown — just refresh the model header."""
@@ -3318,10 +3421,10 @@ if _HAVE_QT:
                     and not self._stream_text):
                 self.conversation.setHtml(
                     "<div style='color:#718096'>Ask the assistant to help diagnose your car. "
-                    "It uses the scan/log open in the File Analyzer tab, can browse your stored "
-                    "logs, and — when the car is connected in the Live tab — read live DTCs, a "
+                    "It uses the scan/log open on the Files page, can browse your stored "
+                    "logs, and — when the car is connected on the Live page — read live DTCs, a "
                     "PID snapshot, VIN and readiness.<br><br>Set your provider and API key in "
-                    "<b>⚙ AI Settings</b>, then type a message below. Use <b>＋ New chat</b> to "
+                    "<b>AI Settings</b>, then type a message below. Use <b>＋ New chat</b> to "
                     "start a fresh conversation.</div>")
                 return
             blocks = []
@@ -3409,7 +3512,7 @@ if _HAVE_QT:
                     "\n\nYou have tools to investigate. FILE tools read the user's stored logs "
                     f"(folder: {DEFAULT_LOGS_DIR}): list_logs, read_log, read_autoscan, "
                     "diagnose_log, find_events, performance, lookup_dtc. LIVE tools read the "
-                    "connected car when an adapter is plugged in (Live tab): obd_status, "
+                    "connected car when an adapter is plugged in (Live page): obd_status, "
                     "read_live_dtcs, snapshot_pids, vehicle_info, readiness. Proactively use "
                     "these tools to gather data before concluding, and tell the user what you "
                     "find and the most likely fix.")
@@ -3794,7 +3897,7 @@ if _HAVE_QT:
             conn = getattr(self.main.live_tab, "conn", None)
             if conn is None:
                 QtWidgets.QMessageBox.information(
-                    self, "Enhanced PIDs", "Connect to an adapter in the Live tab first.")
+                    self, "Enhanced PIDs", "Connect to an adapter on the Live page first.")
                 return
             for r, p in enumerate(self.pids):
                 val = self.enh.query_enhanced(conn, p)
@@ -3838,7 +3941,7 @@ if _HAVE_QT:
             if self.veh is None:
                 v.addWidget(QtWidgets.QLabel(
                     "No active vehicle. Open the Garage and Set Active, or read Vehicle Info "
-                    "(Live tab) to add your car first."))
+                    "(Live page) to add your car first."))
                 bb = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Close)
                 bb.rejected.connect(self.reject)
                 v.addWidget(bb)
@@ -3991,11 +4094,11 @@ if _HAVE_QT:
             row = QtWidgets.QHBoxLayout()
             row.setSpacing(14)
             row.addWidget(self._action_card(
-                "🔌  Connect", "Live OBD-II over an ELM327 adapter", "Connect", self._connect, True))
+                "Connect a car", "Live OBD-II over an ELM327 adapter", "Connect", self._connect, True))
             row.addWidget(self._action_card(
-                "📂  Open log", "VCDS / Torque / OBD Fusion CSV", "Open…", self._open_csv, False))
+                "Open a log", "VCDS / Torque / OBD Fusion CSV", "Open…", self._open_csv, False))
             row.addWidget(self._action_card(
-                "📋  Auto-Scan", "Open a VCDS Auto-Scan .TXT", "Open…", self._open_scan, False))
+                "Open an Auto-Scan", "Read a VCDS Auto-Scan .TXT", "Open…", self._open_scan, False))
             outer.addLayout(row)
 
             low = QtWidgets.QHBoxLayout()
@@ -4004,6 +4107,16 @@ if _HAVE_QT:
             self.veh_body = QtWidgets.QLabel("—")
             self.veh_body.setWordWrap(True)
             vbody.addWidget(self.veh_body)
+            vbody.addSpacing(8)
+            vact = QtWidgets.QHBoxLayout()
+            btn_garage = QtWidgets.QPushButton("Open Garage")
+            btn_garage.clicked.connect(lambda: self.main.show_garage())
+            btn_ident = QtWidgets.QPushButton("Identify on Live")
+            btn_ident.clicked.connect(lambda: self.main.show_page("live"))
+            vact.addWidget(btn_garage)
+            vact.addWidget(btn_ident)
+            vact.addStretch(1)
+            vbody.addLayout(vact)
             vbody.addStretch(1)
             low.addWidget(self.veh_card, 1)
 
@@ -4022,7 +4135,7 @@ if _HAVE_QT:
             v = QtWidgets.QVBoxLayout(card)
             v.setContentsMargins(18, 16, 18, 16)
             t = QtWidgets.QLabel(title)
-            t.setStyleSheet("font-size:13pt; font-weight:bold;")
+            t.setObjectName("H2")
             s = QtWidgets.QLabel(subtitle)
             s.setObjectName("Muted")
             s.setWordWrap(True)
@@ -4042,7 +4155,7 @@ if _HAVE_QT:
             v = QtWidgets.QVBoxLayout(card)
             v.setContentsMargins(18, 14, 18, 14)
             h = QtWidgets.QLabel(heading)
-            h.setStyleSheet("font-weight:bold;")
+            h.setObjectName("H2")
             v.addWidget(h)
             return card, v
 

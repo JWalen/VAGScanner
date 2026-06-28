@@ -60,7 +60,7 @@ def test_ai_tab_builds(qapp):
     assert tab.chk_tools.isChecked()  # AI-uses-tools toggle present
     assert isinstance(tab.input, gui_app.ChatInput)
     assert tab.chat_list is not None and tab.btn_new is not None  # multi-chat UI
-    assert "🤖" in tab.model_label.text()                          # model header
+    assert "·" in tab.model_label.text()                           # "provider · model" header
     win.close()
 
 
