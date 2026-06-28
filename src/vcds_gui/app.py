@@ -645,6 +645,9 @@ if _HAVE_QT:
             self.btn_open = QtWidgets.QPushButton("Open Measuring CSV…")
             self.btn_open.setObjectName("Accent")
             self.btn_scan = QtWidgets.QPushButton("Open Auto-Scan…")
+            self.btn_example = QtWidgets.QPushButton("Try an example")
+            self.btn_example.setToolTip("Load a bundled sample log + Auto-Scan to explore the app")
+            self.btn_example.setVisible(_examples_dir() is not None)
             self.chk_norm = QtWidgets.QCheckBox("Normalize")
             self.chk_norm.setChecked(True)
             self.chk_measure = QtWidgets.QCheckBox("Measure")
@@ -663,7 +666,7 @@ if _HAVE_QT:
             self.btn_compare.setToolTip("Open a second log and compare it (before/after)")
             self.lbl_info = QtWidgets.QLabel("No file loaded.")
             self.lbl_info.setObjectName("Muted")
-            for w in (self.btn_open, self.btn_scan, _vsep(),
+            for w in (self.btn_open, self.btn_scan, self.btn_example, _vsep(),
                       self.btn_diagnose, self.btn_perf, self.btn_compare, _vsep(),
                       self.view_combo, self.chk_norm, self.chk_measure, self.btn_fit,
                       self.btn_export):
@@ -742,6 +745,7 @@ if _HAVE_QT:
             # signals
             self.btn_open.clicked.connect(self.open_csv_dialog)
             self.btn_scan.clicked.connect(self.open_scan_dialog)
+            self.btn_example.clicked.connect(self.load_example)
             self.chk_norm.toggled.connect(self.plot.set_normalize)
             self.chk_measure.toggled.connect(self.plot.set_measure)
             self.btn_fit.clicked.connect(self.plot.auto_fit)
@@ -881,6 +885,20 @@ if _HAVE_QT:
             )
             if path:
                 self.load_scan(path)
+
+        def load_example(self):
+            """Load a bundled sample log + Auto-Scan so a new user can explore."""
+            ex = _examples_dir()
+            if not ex:
+                return
+            for name in ("classic_group.CSV", "advanced_uds.CSV"):
+                p = os.path.join(ex, name)
+                if os.path.isfile(p):
+                    self.load_csv(p)
+                    break
+            scan = os.path.join(ex, "autoscan.TXT")
+            if os.path.isfile(scan):
+                self.load_scan(scan)
 
         def load_scan(self, path: str):
             try:
@@ -1488,50 +1506,59 @@ if _HAVE_QT:
             return None if txt == "Auto" else int(txt)
 
         def connect_adapter(self):
+            if self.conn is not None:
+                self.disconnect_adapter()  # don't leak a prior COM/socket handle
             port = self.port_combo.currentText().strip() or None
             self.conn_status.setText("Connecting…")
+            app = QtWidgets.QApplication.instance()
+            if app is not None:
+                app.setOverrideCursor(QtGui.QCursor(QtCore.Qt.WaitCursor))
             QtWidgets.QApplication.processEvents()
             try:
-                self.conn = live.connect(port=port, baud=self._baud(),
-                                         prefer_async=self.chk_async.isChecked())
-            except Exception as exc:  # noqa: BLE001
-                self.conn = None
-                self.conn_status.setText(f"<span style='color:#E53E3E'>Failed: {exc}</span>")
-                return
-            supported = self.conn.supported()
-            # Offer EVERY supported PID; default-check only the curated set so a
-            # session doesn't log 100+ channels unless the user opts in.
-            self.channels = live.build_channels(supported, include_all=True)
-            self.pid_list.clear()
-            for ch in self.channels:
-                unit = f"  [{ch.unit}]" if ch.unit else ""
-                item = QtWidgets.QListWidgetItem(f"{ch.name}{unit}")
-                item.setFlags(item.flags() | QtCore.Qt.ItemIsUserCheckable)
-                is_default = (
-                    ch.command_name in live.DEFAULT_CHANNELS_BY_CMD
-                    or ch.name in live.DEFAULT_CHANNELS_BY_NAME
-                )
-                item.setCheckState(QtCore.Qt.Checked if is_default else QtCore.Qt.Unchecked)
-                item.setData(QtCore.Qt.UserRole, ch.name)
-                self.pid_list.addItem(item)
-            self.pid_search.clear()
-            self._filter_pids("")
-            self._update_pid_count()
-            self._set_connected(True)
-            if not supported:
-                # Port opened but no OBD-II link negotiated — give an actionable hint
-                # instead of a green "Connected (0 PIDs)" dead end.
+                try:
+                    self.conn = live.connect(port=port, baud=self._baud(),
+                                             prefer_async=self.chk_async.isChecked())
+                except Exception as exc:  # noqa: BLE001
+                    self.conn = None
+                    self.conn_status.setText(f"<span style='color:#E53E3E'>Failed: {exc}</span>")
+                    return
+                supported = self.conn.supported()
+                # Offer EVERY supported PID; default-check only the curated set so a
+                # session doesn't log 100+ channels unless the user opts in.
+                self.channels = live.build_channels(supported, include_all=True)
+                self.pid_list.clear()
+                for ch in self.channels:
+                    unit = f"  [{ch.unit}]" if ch.unit else ""
+                    item = QtWidgets.QListWidgetItem(f"{ch.name}{unit}")
+                    item.setFlags(item.flags() | QtCore.Qt.ItemIsUserCheckable)
+                    is_default = (
+                        ch.command_name in live.DEFAULT_CHANNELS_BY_CMD
+                        or ch.name in live.DEFAULT_CHANNELS_BY_NAME
+                    )
+                    item.setCheckState(QtCore.Qt.Checked if is_default else QtCore.Qt.Unchecked)
+                    item.setData(QtCore.Qt.UserRole, ch.name)
+                    self.pid_list.addItem(item)
+                self.pid_search.clear()
+                self._filter_pids("")
+                self._update_pid_count()
+                self._set_connected(True)
+                if not supported:
+                    # Port opened but no OBD-II link negotiated — actionable hint
+                    # instead of a green "Connected (0 PIDs)" dead end.
+                    self.conn_status.setText(
+                        "<span style='color:#DD6B20'>Adapter found, but no OBD-II link</span> — "
+                        "turn the ignition to ON/RUN, check the cable/adapter, or pick a "
+                        "specific baud and reconnect.")
+                    return
+                mode = " · ⚡ smooth" if getattr(self.conn, "is_async", False) else ""
                 self.conn_status.setText(
-                    "<span style='color:#DD6B20'>Adapter found, but no OBD-II link</span> — "
-                    "turn the ignition to ON/RUN, check the cable/adapter, or pick a "
-                    "specific baud and reconnect.")
-                return
-            mode = " · ⚡ smooth" if getattr(self.conn, "is_async", False) else ""
-            self.conn_status.setText(
-                f"<span style='color:#38A169'>Connected</span> — {self.conn.protocol()} "
-                f"({len(supported)} PIDs){mode} · identifying vehicle…"
-            )
-            self._start_identify()
+                    f"<span style='color:#38A169'>Connected</span> — {self.conn.protocol()} "
+                    f"({len(supported)} PIDs){mode} · identifying vehicle…"
+                )
+                self._start_identify()
+            finally:
+                if app is not None:
+                    app.restoreOverrideCursor()
 
         @staticmethod
         def _wait_thread(t, ms=3000):
@@ -4416,6 +4443,18 @@ if _HAVE_QT:
             self.statusBar().showMessage(
                 f"Logs dir: {DEFAULT_LOGS_DIR}   ·   Press F1 for help"
             )
+            self.setAcceptDrops(True)  # drop a .csv/.txt onto the window to open it
+            # Restore the last window position/size (skip under offscreen tests).
+            if os.environ.get("QT_QPA_PLATFORM") != "offscreen":
+                geo = self.settings.value("win/geometry")
+                if geo is not None:
+                    try:
+                        self.restoreGeometry(geo)
+                        st = self.settings.value("win/state")
+                        if st is not None:
+                            self.restoreState(st)
+                    except Exception:  # noqa: BLE001
+                        pass
             # Offer the quick tour on first run, then check for updates — both
             # after the window is shown, and both skipped in headless runs.
             QtCore.QTimer.singleShot(400, self._maybe_first_run_tour)
@@ -4552,6 +4591,12 @@ if _HAVE_QT:
                 b.setIcon(_svg_icon(k, muted))
 
         def closeEvent(self, event):
+            # Remember where the user left the window.
+            try:
+                self.settings.setValue("win/geometry", self.saveGeometry())
+                self.settings.setValue("win/state", self.saveState())
+            except Exception:  # noqa: BLE001
+                pass
             # Tear down every worker thread / pop-out window so we don't get a
             # "QThread destroyed while still running" crash on exit.
             try:
@@ -4571,6 +4616,24 @@ if _HAVE_QT:
                 except Exception:  # noqa: BLE001
                     pass
             super().closeEvent(event)
+
+        def dragEnterEvent(self, event):
+            md = event.mimeData()
+            if md.hasUrls() and any(u.toLocalFile().lower().endswith((".csv", ".txt"))
+                                    for u in md.urls()):
+                event.acceptProposedAction()
+
+        def dropEvent(self, event):
+            for u in event.mimeData().urls():
+                p = u.toLocalFile()
+                low = p.lower()
+                if low.endswith(".txt"):
+                    self.show_page("files")
+                    self.analyzer.load_scan(p)
+                elif low.endswith(".csv"):
+                    self.show_page("files")
+                    self.analyzer.load_csv(p)
+            event.acceptProposedAction()
 
         def show_page(self, key: str):
             idx = self._page_index.get(key)
@@ -4918,6 +4981,20 @@ def _grab_png(widget) -> bytes:
     return bytes(buffer.data())
 
 
+def _examples_dir() -> Optional[str]:
+    """Locate the bundled example logs (frozen bundle or source tree), else None."""
+    cands = []
+    base = getattr(sys, "_MEIPASS", None)
+    if base:
+        cands.append(os.path.join(base, "examples"))
+    here = os.path.dirname(os.path.abspath(__file__))
+    cands.append(os.path.join(here, "..", "..", "examples"))
+    for c in cands:
+        if c and os.path.isdir(c):
+            return c
+    return None
+
+
 def _find_app_icon() -> Optional[str]:
     """Locate app.ico in the PyInstaller bundle or the source tree, else None."""
     candidates = []
@@ -4940,6 +5017,8 @@ def _export_clip(mlog: "parse.MeasuringLog", path: str, xmin: float, xmax: float
     """
     import bisect
 
+    if not mlog.raw_series:
+        return 0  # nothing to export (zero-channel log)
     # choose the channel with the most samples as the time reference
     ref_name = max(mlog.raw_series, key=lambda n: len(mlog.raw_series[n]["time"]))
     ref_t = mlog.raw_series[ref_name]["time"]

@@ -7,6 +7,7 @@ figure, fine for relative comparison.
 
 from __future__ import annotations
 
+import bisect
 from dataclasses import dataclass
 from typing import Optional
 
@@ -39,15 +40,17 @@ class Battery:
 
 
 def _at(series, when):
-    """Value at the sample whose time is nearest `when` (skips None)."""
-    best = best_dt = None
+    """Value at the sample whose time is nearest `when` (O(log n); times sorted)."""
     times, values = series["time"], series["value"]
-    for k in range(len(times)):
-        if values[k] is None:
-            continue
-        dt = abs(times[k] - when)
-        if best_dt is None or dt < best_dt:
-            best_dt, best = dt, values[k]
+    if not times:
+        return None
+    j = bisect.bisect_left(times, when)
+    best = bd = None
+    for k in (j - 1, j):
+        if 0 <= k < len(times) and values[k] is not None:
+            d = abs(times[k] - when)
+            if bd is None or d < bd:
+                bd, best = d, values[k]
     return best
 
 

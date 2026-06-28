@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.35.0] - 2026-06-28
+
+### Fixed (assessment wave 2)
+- **Reconnecting no longer leaks the previous adapter handle** — a re-connect now
+  closes the old COM/socket connection first.
+- **Much faster analysis on big logs.** The nearest‑time lookups in diagnosis, trip
+  and performance are now O(log n) (bisect) instead of O(n·m) — no more multi‑second
+  freezes on long recordings.
+- **Computed channels never emit NaN/inf** (e.g. divide‑by‑zero), which previously
+  could corrupt MCP JSON output and skew stats.
+- **Export no longer crashes on a zero‑channel log.**
+
+### Added
+- **Remembers your window** — size and position are restored between launches.
+- **"Try an example"** button on the Files page loads a bundled sample log +
+  Auto‑Scan, so a brand‑new user has something to explore immediately.
+- **Drag‑and‑drop** a `.csv`/`.txt` onto the window to open it.
+- A **wait cursor** while connecting so the adapter handshake doesn't look frozen.
+
 ## [1.34.0] - 2026-06-28
 
 ### Fixed (assessment wave 1)
@@ -852,7 +871,8 @@ First public release.
   installer, and publishes a GitHub Release on each `v*` tag.
 - 54-test pytest suite (no hardware; the live path is mocked).
 
-[Unreleased]: https://github.com/JWalen/OBD-Toolkit/compare/v1.34.0...HEAD
+[Unreleased]: https://github.com/JWalen/OBD-Toolkit/compare/v1.35.0...HEAD
+[1.35.0]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v1.35.0
 [1.34.0]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v1.34.0
 [1.33.0]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v1.33.0
 [1.32.0]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v1.32.0

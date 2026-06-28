@@ -7,6 +7,7 @@ than a calibrated dyno figure.
 
 from __future__ import annotations
 
+import bisect
 from dataclasses import dataclass
 from typing import List, Optional
 
@@ -225,13 +226,16 @@ def estimate_power(
 
 def _value_at(series, when: float) -> Optional[float]:
     t = series["time"]
-    best = None
-    best_dt = None
-    for k in range(len(t)):
-        dt = abs(t[k] - when)
-        if best_dt is None or dt < best_dt:
-            best_dt = dt
-            best = series["value"][k]
+    if not t:
+        return None
+    v = series["value"]
+    j = bisect.bisect_left(t, when)  # O(log n); time axis is monotonic
+    best = bd = None
+    for k in (j - 1, j):
+        if 0 <= k < len(t):
+            dt = abs(t[k] - when)
+            if bd is None or dt < bd:
+                bd, best = dt, v[k]
     return best
 
 

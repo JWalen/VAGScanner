@@ -11,6 +11,7 @@ Standard-library only.
 from __future__ import annotations
 
 import ast
+import math
 import operator
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
@@ -52,7 +53,10 @@ def evaluate_expression(expr: str, variables: Dict[str, float]) -> float:
     the functions abs/min/max/round. Anything else raises ``ValueError``.
     """
     tree = ast.parse(expr, mode="eval")
-    return float(_eval_node(tree.body, variables))
+    val = float(_eval_node(tree.body, variables))
+    if not math.isfinite(val):  # inf/NaN (e.g. divide-by-zero) breaks JSON + stats
+        raise ValueError("non-finite result")
+    return val
 
 
 @dataclass

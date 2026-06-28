@@ -11,6 +11,7 @@ the MCP ``diagnose`` tool and the report generator.
 
 from __future__ import annotations
 
+import bisect
 import re
 from dataclasses import dataclass, field
 from typing import List, Optional
@@ -191,14 +192,17 @@ def _timing_findings(scan: Optional[AutoScan], log: Optional[MeasuringLog],
 
 
 def _nearest_value(times, values, when):
-    """Value at the sample whose time is closest to `when` (skips None)."""
-    best = best_dt = None
-    for k in range(len(times)):
-        if values[k] is None:
-            continue
-        dt = abs(times[k] - when)
-        if best_dt is None or dt < best_dt:
-            best_dt, best = dt, values[k]
+    """Value at the sample whose time is closest to `when` (O(log n) — times are
+    monotonic). Checks the two candidates around the insertion point."""
+    if not times:
+        return None
+    j = bisect.bisect_left(times, when)
+    best = bd = None
+    for k in (j - 1, j):
+        if 0 <= k < len(times) and values[k] is not None:
+            d = abs(times[k] - when)
+            if bd is None or d < bd:
+                bd, best = d, values[k]
     return best
 
 
