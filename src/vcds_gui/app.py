@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import bisect
 import html as _html
+import math
 import os
 import re
 import sys
@@ -1204,33 +1205,41 @@ if _HAVE_QT:
 
         @QtCore.Slot(dict)
         def update_values(self, values):
-            now = time.perf_counter()
-            if self._last_mono is not None:
-                dt = now - self._last_mono
-                if dt > 0:
-                    inst = 1.0 / dt
-                    self._rate_ema = inst if self._rate_ema is None \
-                        else 0.7 * self._rate_ema + 0.3 * inst
-                    self.status.setText(
-                        f"Streaming live · ~{self._rate_ema:.1f} updates/s · "
-                        f"{len(self._channels)} PIDs")
-            self._last_mono = now
-            for name, val in values.items():
-                r = self._rows.get(name)
-                if r is None or val is None:
-                    continue
-                st = self._stats.get(name)
-                if st is None:
-                    st = [val, val, val]
-                    self._stats[name] = st
-                arrow = "▲" if val > st[2] + 1e-9 else ("▼" if val < st[2] - 1e-9 else "•")
-                st[0] = min(st[0], val)
-                st[1] = max(st[1], val)
-                st[2] = val
-                self.table.item(r, 1).setText(f"{val:g}")
-                self.table.item(r, 3).setText(f"{st[0]:g}")
-                self.table.item(r, 4).setText(f"{st[1]:g}")
-                self.table.item(r, 5).setText(arrow)
+            # A Qt slot must never raise — an unhandled exception here aborts the
+            # whole app. Guard every step (bad value, missing item, late emit).
+            try:
+                now = time.perf_counter()
+                if self._last_mono is not None:
+                    dt = now - self._last_mono
+                    if dt > 0:
+                        inst = 1.0 / dt
+                        self._rate_ema = inst if self._rate_ema is None \
+                            else 0.7 * self._rate_ema + 0.3 * inst
+                        self.status.setText(
+                            f"Streaming live · ~{self._rate_ema:.1f} updates/s · "
+                            f"{len(self._channels)} PIDs")
+                self._last_mono = now
+                for name, val in values.items():
+                    r = self._rows.get(name)
+                    if r is None or val is None or not isinstance(val, (int, float)):
+                        continue
+                    if not math.isfinite(val):
+                        continue
+                    st = self._stats.get(name)
+                    if st is None:
+                        st = [val, val, val]
+                        self._stats[name] = st
+                    arrow = "▲" if val > st[2] + 1e-9 else ("▼" if val < st[2] - 1e-9 else "•")
+                    st[0] = min(st[0], val)
+                    st[1] = max(st[1], val)
+                    st[2] = val
+                    for col, txt in ((1, f"{val:g}"), (3, f"{st[0]:g}"),
+                                     (4, f"{st[1]:g}"), (5, arrow)):
+                        it = self.table.item(r, col)
+                        if it is not None:
+                            it.setText(txt)
+            except Exception:  # noqa: BLE001 - never let a render glitch crash the app
+                pass
 
         def start_poll(self, conn):
             self.stop_poll()
@@ -1240,16 +1249,29 @@ if _HAVE_QT:
             self._poller.moveToThread(self._thread)
             self._thread.started.connect(self._poller.run)
             self._poller.values.connect(self.update_values)
-            self._poller.failed.connect(lambda m: self.status.setText(f"Stopped: {m}"))
+            self._poller.failed.connect(self._on_poll_failed)
             self._thread.start()
             self.status.setText("Streaming live…")
 
+        @QtCore.Slot(str)
+        def _on_poll_failed(self, msg):
+            self.status.setText(f"Stopped: {msg}")
+
         def stop_poll(self):
+            # Disconnect first so a late cross-thread emit can't reach a widget
+            # that's being torn down (a classic segfault on close).
             if self._poller is not None:
                 self._poller.stop()
+                try:
+                    self._poller.values.disconnect(self.update_values)
+                    self._poller.failed.disconnect(self._on_poll_failed)
+                except (RuntimeError, TypeError):
+                    pass
             if self._thread is not None:
                 self._thread.quit()
-                self._thread.wait(1500)
+                if not self._thread.wait(2000):
+                    self._thread.terminate()  # adapter stalled; don't hang on close
+                    self._thread.wait(500)
             self._poller = self._thread = None
 
         def closeEvent(self, event):
@@ -3122,16 +3144,27 @@ if _HAVE_QT:
             self._poller.moveToThread(self._thread)
             self._thread.started.connect(self._poller.run)
             self._poller.values.connect(self.update_values)
-            self._poller.failed.connect(lambda m: self.status.setText(f"Stopped: {m}"))
+            self._poller.failed.connect(self._on_poll_failed)
             self._thread.start()
             self.status.setText("Streaming live…")
+
+        @QtCore.Slot(str)
+        def _on_poll_failed(self, msg):
+            self.status.setText(f"Stopped: {msg}")
 
         def stop_poll(self):
             if self._poller is not None:
                 self._poller.stop()
+                try:  # avoid a late emit reaching a widget being torn down
+                    self._poller.values.disconnect(self.update_values)
+                    self._poller.failed.disconnect(self._on_poll_failed)
+                except (RuntimeError, TypeError):
+                    pass
             if self._thread is not None:
                 self._thread.quit()
-                self._thread.wait(1500)
+                if not self._thread.wait(2000):
+                    self._thread.terminate()
+                    self._thread.wait(500)
             self._poller = self._thread = None
 
         def closeEvent(self, event):
@@ -3188,10 +3221,14 @@ if _HAVE_QT:
                     elif op in ("<", "<="):
                         g.crit_lo = val  # honor low-side rules like the alert banner
 
+        @QtCore.Slot(dict)
         def update_values(self, values):
-            for name, g in self.gauges.items():
-                if name in values:
-                    g.set_value(values[name])
+            try:  # a Qt slot must never raise — that would abort the app
+                for name, g in self.gauges.items():
+                    if name in values:
+                        g.set_value(values[name])
+            except Exception:  # noqa: BLE001
+                pass
 
     # --------------------------------------------------------------------- #
     # Tab 3 — AI Assistant
@@ -4880,6 +4917,11 @@ if _HAVE_QT:
                 self.ai_tab.refresh_vehicle()
             elif key == "dashboard":
                 self.dashboard.refresh()
+            elif key == "live":
+                # Re-scan ports each time so freshly-plugged adapters show up,
+                # without clobbering a port the user already typed/selected.
+                if self.live_tab.conn is None:
+                    self.live_tab.scan_ports()
 
         def show_settings(self):
             if SettingsDialog(self).exec():

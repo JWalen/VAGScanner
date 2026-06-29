@@ -588,6 +588,22 @@ def _strip(value) -> Optional[float]:
         return None
 
 
+def _clean_vin(value) -> Optional[str]:
+    """Normalize a VIN from python-OBD (str / bytes / bytearray / list/tuple) to
+    the bare 17-ish alphanumeric string — never a 'bytearray(...)' / "['..']" blob."""
+    if isinstance(value, (bytes, bytearray)):
+        text = value.decode("ascii", "ignore")
+    elif isinstance(value, (list, tuple)):
+        text = "".join(
+            v.decode("ascii", "ignore") if isinstance(v, (bytes, bytearray)) else str(v)
+            for v in value)
+    else:
+        text = str(value)
+    # Keep only valid VIN characters (alphanumerics; I/O/Q aren't used in VINs).
+    cleaned = "".join(ch for ch in text.upper() if ch.isalnum())
+    return cleaned or None
+
+
 class PyOBDConnection:
     """Adapter around python-OBD (``obd.Async`` preferred, ``obd.OBD`` fallback)."""
 
@@ -855,7 +871,7 @@ class PyOBDConnection:
         cmd = getattr(self._obd.commands, "VIN", None)
         resp = self._one_shot(cmd)
         if resp and not resp.is_null() and resp.value:
-            return str(resp.value).strip()
+            return _clean_vin(resp.value)
         return None
 
     def read_calibration_ids(self) -> List[str]:

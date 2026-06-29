@@ -159,6 +159,15 @@ def test_new_dtc_trigger_fires(tmp_path):
     assert "Conditions at trigger:" in text
 
 
+def test_clean_vin_normalizes_messy_values():
+    assert live._clean_vin("WAUZZZ8K9BA123456") == "WAUZZZ8K9BA123456"
+    assert live._clean_vin(bytearray(b"WAUZZZ8K9BA123456")) == "WAUZZZ8K9BA123456"
+    assert live._clean_vin(b"WAUZZZ8K9BA123456") == "WAUZZZ8K9BA123456"
+    assert live._clean_vin(["WAUZZZ8K9BA123456"]) == "WAUZZZ8K9BA123456"
+    assert live._clean_vin("WAUZ ZZ8K9-BA123456\x00") == "WAUZZZ8K9BA123456"
+    assert live._clean_vin("") is None
+
+
 def test_read_dtcs_surfaces_codes(tmp_path):
     conn = FakeOBD(dtc_at=-1)  # report immediately
     dtcs = live.read_dtcs(conn)

@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.40.0] - 2026-06-29
+
+### Fixed
+- **Live Data no longer crashes the app.** The update slot is now fully guarded
+  (a bad/non-finite value or a missing cell can't abort the app), and the poller
+  threads disconnect before teardown so a late update can't reach a closing window
+  (a classic segfault). Applies to both the Live Data table and the Gauges window.
+- **VIN now displays cleanly.** A VIN returned as bytes/array (e.g.
+  `bytearray(b'WAUZ…')` or `['WAUZ…']`) is normalized to the bare alphanumeric
+  string instead of showing the wrapper text.
+
+### Changed
+- **Adapter ports re-scan automatically** each time you open the Live page (when
+  not already connected), so a freshly-plugged USB/Bluetooth adapter shows up in
+  the selectable dropdown without clicking Scan Ports.
+
 ## [1.39.0] - 2026-06-29
 
 ### Added
@@ -922,7 +938,8 @@ First public release.
   installer, and publishes a GitHub Release on each `v*` tag.
 - 54-test pytest suite (no hardware; the live path is mocked).
 
-[Unreleased]: https://github.com/JWalen/OBD-Toolkit/compare/v1.39.0...HEAD
+[Unreleased]: https://github.com/JWalen/OBD-Toolkit/compare/v1.40.0...HEAD
+[1.40.0]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v1.40.0
 [1.39.0]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v1.39.0
 [1.38.0]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v1.38.0
 [1.37.0]: https://github.com/JWalen/OBD-Toolkit/releases/tag/v1.37.0
